@@ -43,16 +43,21 @@ def init_git_handler(self, source, version_cache, log):
     source, source_identifier, commit = self.unpack_source(source)
 
     cache = os.path.join(version_cache, source_identifier)
+    try_init = True
+    update_from_origin = False  # TODO: config that gives more control
 
-    if not os.path.exists(cache + os.path.sep + '.git'):
-        repo = Repo.clone_from(source, cache)
-        if log:
-            log.write('cloning from', source)
-    else:
-        if log:
-            log.write('updating from', source)
-        repo = Repo(cache)
-        repo.git.execute(['git', 'fetch'])
+    while try_init:
+        if not os.path.exists(cache + os.path.sep + '.git'):
+            repo = Repo.clone_from(source, cache)
+            if log:
+                log.write('cloning from', source)
+        else:
+            if log:
+                log.write('updating from', source)
+            repo = Repo(cache)
+            if update_from_origin:
+                repo.git.execute(['git', 'fetch'])
+
         if commit:
             branches = repo.git.execute(['git', 'branch', '--contains', commit])
             branch = branches.split('\n')[-1].strip()
@@ -62,18 +67,27 @@ def init_git_handler(self, source, version_cache, log):
         else:
             branch = None
 
-        if branch:
-            repo.git.checkout(branch)  # TODO: is this the right/best way?
-            try:
-                repo.remotes.origin.pull(branch)
-            except AssertionError, e:
-                if '[up to date]' not in str(e):
-                    raise
+        try:
+            if branch:
+                repo.git.checkout(branch)  # TODO: is this the right/best way?
+                if update_from_origin:
+                    try:
+                        repo.remotes.origin.pull(branch)
+                    except AssertionError, e:
+                        if '[up to date]' not in str(e):
+                            raise
 
-    if commit:  # TODO: this is not always working? maybe always checkout branch first?
-        if log:
-            log.write('using commit', commit)
-        repo.git.checkout(commit)
+            if commit:  # TODO: this is not always working? maybe always checkout branch first?
+                if log:
+                    log.write('using commit', commit)
+                repo.git.checkout(commit)
+        except:
+            if update_from_origin:
+                raise
+            else:
+                update_from_origin = True
+                continue
+        try_init = False
 
     return repo
 
