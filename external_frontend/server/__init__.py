@@ -23,10 +23,11 @@ class StaticsServer(RetrieveAPIView):
         import os
         super(StaticsServer, self).__init__(*args, **kwargs)
         try:
-            self.storage = self.get_config()['storage']
+            self.storages = self.get_config()['frontend'].USED_STORAGE
         except KeyError:
-            raise Exception('StaticsServer view needs to be initialized with "storage" defined in view_config\
-                            or as EXTERNAL_FRONTEND.FRONTEND.STORAGE setting')
+            raise
+            raise Exception('StaticsServer view needs to be initialized with "frontend" defined in view_config\
+                            or with EXTERNAL_FRONTEND.FRONTEND.BUILDER.STORAGE setting')
 
     def get_format_suffix(self, **kwargs):
         if len(kwargs.get('file').split('.')) > 2 and kwargs.get('file').split('.')[-1] == 'js' and kwargs.get('file').split('.')[-2] in ['json', 'html']:
@@ -40,13 +41,17 @@ class StaticsServer(RetrieveAPIView):
         # TODO: is this right? istn't response created on the fly?
         from introspective_api.response import ApiResponse
         requirejsFallback = self.get_format_suffix(**kwargs).split('.') > 2
-        try:
-            return ApiResponse(self.storage.get(requested_file, requirejsFallback=requirejsFallback))
-        except self.storage.PathNotFound:
-            file_path = ''
-            file_name = ''
-            root = self.storage.root
 
+        checked_dirs = []
+        for storage in self.storages:
+            try:
+                return ApiResponse(storage.get(requested_file, requirejsFallback=requirejsFallback))
+            except storage.PathNotFound:
+                checked_dirs.append(storage.root)
+
+        file_path = ''
+        file_name = ''
+        for root in checked_dirs:
             for folder in requested_file.split('/'):
                 if os.path.exists(os.path.join(root, file_path, folder + os.path.sep)):
                     file_path += folder + os.path.sep
@@ -59,12 +64,12 @@ class StaticsServer(RetrieveAPIView):
                 else:
                     break
 
-            debug_info = {
-                'requested': requested_file,
-                'requirejsFallback': requirejsFallback,
-                'root': root,
-                'file_name': file_name,
-                'found_path': file_path,
-                'dir': os.listdir(os.path.join(root, file_path))
-            }
-            return ApiResponse(debug_info, 404)
+        debug_info = {
+            'requested': requested_file,
+            'requirejsFallback': requirejsFallback,
+            'checked_dirs': checked_dirs,
+            'file_name': file_name,
+            'found_path': file_path,
+            'dirs': ';\n'.join(','.join(os.listdir(os.path.join(root, file_path))) for root in checked_dirs)
+        }
+        return ApiResponse(debug_info, 404)

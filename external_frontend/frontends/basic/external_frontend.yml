@@ -1,0 +1,13 @@
+unversioned:
+    - ./main.js
+    - ./require.js
+    - ./json2.js
+    - ./require-text.js
+    - /img/
+collect:
+    /requirejs-plugins/: lib!requirejs/plugins/
+staging:
+    configurations:
+        debug:
+            exclusive_files:
+                - ./fixtures/

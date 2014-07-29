@@ -17,7 +17,11 @@ class Storage(object):
         pass
 
     def clean(self):
-        shutil.rmtree(self.root)
+        if self.exists():
+            shutil.rmtree(self.root)
+
+    def exists(self):
+        return os.path.exists(self.root)
 
     def remove(self, path):
         raise NotImplemented('subclass needs to specify behaviour')
@@ -33,7 +37,7 @@ class Storage(object):
 
     def solve_path(self, path_template, content):
         current_version = 1
-        if True:#settings.DEBUG:
+        if True:  # TODO: implement / settings.DEBUG:
             return path_template.format(version=current_version)
 
         path = os.path.join(self.root, path_template)

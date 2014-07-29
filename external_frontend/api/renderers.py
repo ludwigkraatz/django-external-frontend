@@ -28,7 +28,7 @@ class CSSRenderer(BaseRenderer):
     """
     Plain text parser.
     """
-    media_type = 'text/style'
+    media_type = 'text/css'
     format = 'css'
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
@@ -42,13 +42,6 @@ class CSSRenderer(BaseRenderer):
             return data.css
 
         return str(data)
-
-
-class JSONRenderer(JSONRenderer):
-    """
-    Plain text parser.
-    """
-    pass
 
 
 class requirejsFallbackRenderer(JSONRenderer):
@@ -106,6 +99,17 @@ class SvgRenderer(BaseRenderer):
     format = 'svg'
 
     def render(self, data, *args, **kwargs):
+        return data
+
+
+# JSONRenderer is defined last
+class JSONRenderer(JSONRenderer):
+    """
+    Plain text parser.
+    """
+
+    def render(self, data, *args, **kwargs):
+
         return data
 
 

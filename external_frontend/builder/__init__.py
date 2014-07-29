@@ -1,4 +1,57 @@
 import os
+import time
+import sys
+import json
+import logging
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from ..utils.dict import dict_merge
+
+
+def launch_observer(storages, builder, src, log):
+
+    class Handler(FileSystemEventHandler):
+        def prepare_path(self, path):
+            path = os.path.relpath(path, src)
+            prefix = '.' + os.path.sep
+            if not path.startswith(prefix):
+                path = prefix + path
+            return path
+
+        def on_created(self, event):
+            if not event.is_directory:
+                with open(event.src_path, 'r') as content:
+                    path = self.prepare_path(event.src_path)
+                    log.write("Created: " + path)
+                    builder.update(path, content.read(), storages=storages, log=log.with_indent())
+
+        def on_deleted(self, event):
+            if not event.is_directory:
+                path = self.prepare_path(event.src_path)
+                log.write("Removed: " + path)
+                builder.remove(path, storages=storages, log=log.with_indent())
+
+        def on_moved(self, event):
+            if not event.is_directory:
+                with open(event.dest_path, 'r') as content:
+                    path = self.prepare_path(event.src_path)
+                    dest_path = self.prepare_path(event.dest_path)
+                    log.write("Moved: " + path + ' to ' + dest_path)
+                    builder.remove(path, storages=storages, log=log.with_indent())
+                    builder.update(dest_path, content.read(), storages=storages, log=log.with_indent())
+
+        def on_modified(self, event):
+            if not event.is_directory:
+                with open(event.src_path, 'r') as content:
+                    path = self.prepare_path(event.src_path)
+                    log.write("Modified: " + path)
+                    builder.update(path, content.read(), storages=storages, log=log.with_indent())
+
+    event_handler = Handler()
+    observer = Observer()
+    observer.schedule(event_handler, src, recursive=True)
+    observer.start()
+    return observer
 
 
 class FrontendBuilder(object):
@@ -19,21 +72,20 @@ class FrontendBuilder(object):
     def __init__(self, settings=None):
 
         self.src = settings.SRC
+        self.observers = []
+
+        def get_dependencies():
+            #raise Exception(str(settings.__dict__['_dict']))
+            #raise Exception(str([setting.NAME for setting in settings.DEPENDS_ON]))
+            #raise Exception([str(setting) for setting in settings.DEPENDS_ON])
+            return settings.DEPENDS_ON
+        self.get_dependencies = get_dependencies
 
         if not os.path.exists(self.src):
             raise Exception('FrontendBuilder need to be initialized with existing src directory.\
                             "%s" does not exist' % self.src)
 
-        self.storage = settings._parent.STORAGE
-
-        if not self.storage:
-            raise Exception('FrontendBuilder need to be initialized with a storage')
-
         self.source_map = {}
-        #self.load()
-
-    def load_config(self, content):
-        import yaml
         # default
         self.config = {
             'unversioned': [],
@@ -45,17 +97,81 @@ class FrontendBuilder(object):
             }
         }
 
-        self.config = yaml.load(content)
-        self.current_stage = 'debug'
+    def run_dependencies(self, storages, log=None, main_builder=None):
+        main_builder = main_builder or self
+        config = {}
+        for dependency in self.get_dependencies():
+            dependency_log = log.with_indent('loading dependency "%s"' % dependency)
+            if dependency.run(storages=storages, log=dependency_log, main_builder=main_builder):
+                self.set_default_config(dependency.config)
+                # TODO: update config with parent config as default?
+            else:
+                log.write('couldn\'t load dependency "%s"' % dependency)
+        return config
 
-    def load(self, log=None):
-        self.storage.clean()
+    def register_observers(self, observer):
+        if isinstance(observer, list):
+            self.observers += observer
+        else:
+            self.observers.append(observer)
+
+    def run(self, storages, log, main_builder=None):
+        self.load_config(log=log)
+        if main_builder is None:
+            self.clean(storages=storages, log=log.with_indent())
+
+        # first run_dependencies - the default config is set there
+        self.run_dependencies(storages=storages, log=log, main_builder=main_builder)
+        self.load(storages=storages, log=log, main_builder=main_builder)
+
+        self.register_observers(launch_observer(storages, self, self.src, log=log))
+
+        if main_builder is not None:
+            main_builder.register_observers(self.observers)
+            return True
+        else:
+            observer_log = log.with_indent("%s observer started" % len(self.observers))
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                for dependency_observer in self.observers:
+                    dependency_observer.stop()
+            for dependency_observer in self.observers:
+                dependency_observer.join()
+
+    def load_config(self, log=None):
+        import yaml
         try:
-            with open(self.src + os.path.sep + '.external_frontend') as content:
-                self.load_config(content.read())
+            with open(os.path.join(self.src, self.get_frontend_config_path())) as content:
                 log.write('config loaded')
+                self.config = yaml.load(content.read()) or {}
         except IOError:
             log.write('no config found')
+        self.current_stage = 'debug'
+
+    def get_config(self, *args, **kwargs):
+        config = self.config
+        default = kwargs.get('default', None)
+
+        for arg in args:
+            if arg in config:
+                config = config.get(arg)
+            else:
+                return default
+        return config
+
+    def set_default_config(self, config):
+        self.config = dict_merge(config, self.config)
+
+    def clean(self, storages, log=None):
+        for storage in storages:
+            if log:
+                log.write('cleaning "%s"' % storage)
+            storage.clean()
+
+    def load(self, storages, log=None, main_builder=None):
+        log = log.with_indent('loading files')
         for root, dirnames, filenames in os.walk(self.src):
             for path in filenames:
                 if path.startswith('.'):
@@ -64,21 +180,70 @@ class FrontendBuilder(object):
                 if log:
                     log.write(path)
                 with open(os.path.join(self.src, path), 'r') as content:
-                    self.update(path, content.read(), log=log)
+                    self.update(path, content.read(), storages=storages, log=log)
+
+        self.update_configuration(storages, log=log, main_builder=main_builder)
+
+    def update_configuration(self, storages, log=None, main_builder=None):
+        if main_builder is None:
+            # TODO: updated self.config and all merge config of all dependencies
+            # build configuration file
+            self.update(self.get_frontend_config_dest_path(), json.dumps(self.build_frontend_config()), storages, log=log)
+        else:
+            # todo: main_builder.update_configuration(storages, log=log)
+            pass
+
+    def get_frontend_config_path(self):
+        return '.' + os.path.sep + 'external_frontend.yml'
+
+    def get_frontend_config_dest_path(self):
+        return self.get_config('configuration_file') or ('.' + os.path.sep + 'config.json')
+
+    def build_frontend_config(self, content=None):
+        config = {}
+        for key in ['start', 'requirejs']:
+            config[key] = self.get_config(key) or {}
+        for key in ['debug_level']:
+            config[key] = self.get_config(key)
+
+        host = '/api/'
+        config['start']['apps'] = {}
+        for app, app_config in self.get_config('apps', default={}).items():
+            if not isinstance(app_config, dict):
+                app_config = {}
+
+            config['start']['apps'][app] = {
+                'init': {
+                    'host': host,
+                    'content_host': host + 'frontend/content/',
+                    'crossDomain': False
+                },
+                'selector': '[load-' + app+']',
+                'cssConfig': {
+                    'cssUrl': '',
+                    'versions': {},
+                    'themes': {},
+                },
+                'start': {},
+                'appName': app,
+                'appFile': app_config.get('fileName', app),
+                'localesUrl': None,
+                'htmlUrl': None
+            }
+
+        config['requirejs']['baseUrl'] = host + 'frontend/static/'
+        return config
 
     def generate_build_path(self, orig_path):
-        built_root = None
+        built_root = '.'
         collected = False
         ignore = False
         path = orig_path
+        unversioned = None
 
-        # prepare path before processing
-        if not path.startswith('./'):
-            path = './' + path
-
-        if any(
-            path.replace('.' + e, '.{stage}') in self.config['staging']['filtered_files']
-            for e in self.config['staging']['configurations'].keys()
+        if self.get_config('staging', 'filtered_files') and self.get_config('staging', 'configurations') and any(
+            path.replace('.' + e, '.{stage}') in self.get_config('staging', 'filtered_files')
+            for e in self.get_config('staging', 'configurations').keys()
         ):
             paths = path.split(os.path.sep)
             file_parts = paths[-1].split('.')
@@ -88,22 +253,32 @@ class FrontendBuilder(object):
             else:
                 ignore = True
 
-        for configuration, config in self.config['staging']['configurations'].items():
-            if configuration != self.current_stage:
-                for filter in config['exclusive_files']:
-                    if filter in path:
-                        ignore = True
+        if path == self.get_frontend_config_dest_path():
+            unversioned = True
 
-        # collect files in new directory hirachy
+        if self.get_config('staging', 'configurations'):
+            for configuration, config in self.get_config('staging', 'configurations').items():
+                if configuration != self.current_stage:
+                    for filter in config['exclusive_files']:
+                        if filter in path:
+                            ignore = True
 
-        for search_expr in self.config['collect'].keys():
-            if search_expr in path:
-                collected = True
-                # TODO: implement dynamic method
-                built_root = self.config['collect'][search_expr].replace('lib!', 'js'+os.path.sep+'libs'+os.path.sep)
-                # clean collected dir
-                if search_expr.startswith(os.path.sep) and search_expr.endswith(os.path.sep):
-                    path = path.replace(search_expr, os.path.sep)
+        # collect files in new directory hierarchy
+
+        if self.get_config('collect'):
+            for search_expr in self.get_config('collect').keys():
+                if search_expr in path:
+                    collected = True
+                    # TODO: implement dynamic method
+                    built_root = self.get_config('collect')[search_expr].replace('lib!', 'js'+os.path.sep+'libs'+os.path.sep)
+                    if path.startswith('libs'+os.path.sep):
+                        path = path[5:]
+                    elif (os.path.sep+'libs'+os.path.sep) in path:
+                        path = path.replace(os.path.sep+'libs'+os.path.sep, os.path.sep)
+                    # clean collected dir
+                    if search_expr.startswith(os.path.sep) and search_expr.endswith(os.path.sep):
+                        path = path.replace(search_expr, os.path.sep)
+                    break
 
         # matches by folder name are of higher priority
         if (os.path.sep + 'locales' + os.path.sep) in path:
@@ -142,11 +317,13 @@ class FrontendBuilder(object):
                 if directory_name:
                     path = path.replace(os.path.sep + directory_name + os.path.sep, os.path.sep)
 
-            unversioned = False
-            for pattern in self.config['unversioned']:
-                if pattern in path:  # TODO: regex?
-                    unversioned = True
-            if not unversioned and path not in self.config['unversioned']:
+            if unversioned is None:
+                if self.get_config('unversioned'):
+                    for pattern in self.get_config('unversioned'):
+                        if pattern in path:  # TODO: regex?
+                            unversioned = True
+
+            if not unversioned and path not in self.get_config('unversioned'):
                 paths = path.split(os.path.sep)
                 file_parts = paths[-1].split('.')
                 if file_parts[-1] == 'js':
@@ -164,7 +341,8 @@ class FrontendBuilder(object):
         if ignore or not collected:
             return None
         else:
-            return built_root + path
+            path = os.path.join(built_root, path)
+            return path
 
     def get_build_path(self, path):
         """
@@ -175,22 +353,27 @@ class FrontendBuilder(object):
 
         return self.source_map[path]
 
-    def update(self, path, content, log=None):
+    def update(self, path, content, storages, log=None, main_builder=None):
         """
         updates changed sources
 
         returns a map of updated paths and their current version
         """
+        if path == self.get_frontend_config_path():
+            return self.update_configuration(storages, log=log, main_builder=main_builder)
+
         compile_as = None
         if path.endswith('.sass'):
             compile_as = 'scss'
             path = path.replace('.sass', '.css')
         new_path = self.get_build_path(path)
         if new_path is not None:
+
             log.write('new path = ' + new_path)
             if compile_as:
                 content = self.compile(compile_as, content)
-            self.storage.update(new_path, content, log=log)
+            for storage in storages:
+                storage.update(new_path, content, log=log.with_indent(new_path))
         else:
             log.write('ignored')
 
@@ -202,7 +385,7 @@ class FrontendBuilder(object):
                 'debug_info': True,#settings.DEBUG,
             }).compile(content)
 
-    def remove(self, path, log=None):
+    def remove(self, path, storages, log=None, main_builder=None):
         """
         builds those files again, that are influenced by the removed source
 
@@ -211,20 +394,7 @@ class FrontendBuilder(object):
         new_path = self.get_build_path(path)
         if new_path is not None:
             log.write('old path = ' + new_path)
-            self.storage.remove(new_path, log=log)
+            for storage in storages:
+                storage.remove(new_path, log=log.with_indent(new_path))
         else:
             log.write('ignored')
-
-    def get_version(self, path_template, content):
-        """
-        when building the frontend with versioning turned on, the builder stores
-        files in a different version subfolder, when the contend of similar paths
-        differs.
-
-        @param newFile: handle of the new file
-        @param destinationPathTemplate: a python formatting string with a {version} var,
-                                        specifying the destination in the build frontend
-        @param oldFileVersion: the version of the actual file on this path; default = 1
-        """
-        # TODO: self.storage.get_version()
-        pass

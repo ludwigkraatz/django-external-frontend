@@ -1,0 +1,137 @@
+{
+    "debug_level": 1,
+    "start": {
+        "apps": {
+            "brabbl": {
+                "selector": "[load-brabbl]",
+                "cssConfig": {
+                    "cssUrl": "",
+                    "versions": {
+
+                    },
+                    "themes": {
+
+                    }
+                },
+
+                "start": {
+                    "apps": {
+                        "brabbl_angular": {
+                            "selector": "[load-brabbl]"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "requirejs_config":{
+        "buildCSS": false,
+        "baseUrl": "http://localhost:8000/api/frontend/static/",
+        "paths": {
+            "fancyPlugin": "js/libs/requirejs/plugins/fancy-frontend/plugin/1/plugin",
+            "text": "js/libs/requirejs/plugins/text/1/text"
+        },
+        "config": {
+            "versions": {
+                "js": {
+                    "apps":{
+                        "brabbl": {
+                            "loader": {
+                                "version": 1
+                            }
+                        },
+                        "brabbl_angular": {
+                            "loader": {
+                                "version": 1
+                            },
+                            "currentApp": {
+                                "version": 1
+                            },
+                            "services": {
+                                "version": 1
+                            },
+                            "filters": {
+                                "version": 1
+                            },
+                            "directives": {
+                                "version": 1
+                            },
+                            "routes": {
+                                "version": 1
+                            },
+                            "libs": {
+
+                            }
+                        }
+                    },
+                    "libs": {
+                        "jquery/jqeury.js": {
+                                "version": 1,
+                                "url": "cdn.jqeury.com/v1.2.js"
+                            },
+                        "angular/translate": {
+                            "version": 2
+                        }
+                    },
+                    "widgets": {
+
+                    }
+                },
+                "templates": {
+
+                },
+                "locales": {
+
+                }
+            },
+            "htmlUrl": "",
+            "localesUrl": ""
+        },
+        "structure": {
+            "prefix": "{module}",
+            "module": {
+              "path": "{module}"
+            },
+            "plugin": {
+              "path": "/libs/requirejs/plugins/{container}/{plugin}",
+              "container": null
+            },
+
+                "app": {
+                  "path": "/{app}/{file}",
+                  "mainFile": "loader",
+                  "module": "js"
+                },
+                "widget": {
+                  "path": "/widgets/{widget}/{file}",
+                  "name": "widgets",
+                  "module": "js"
+                },
+                "lib": {
+                  "path": "/libs/{lib}",
+                  "module": "js"
+                },
+
+
+
+                "template": {
+                  "path": "/widgets/{template}/{template}.{extension}",
+                  "extension": "html",
+                  "module": "partials"
+                },
+                "css": {
+                  "path": "/widgets/{widget}/{widget}.css",
+                  "theme": "default",
+                  "module": "css"
+                },
+
+
+
+                "locale": {
+                  "path": "/{container}/{locale}.json",
+                  "module": "locales",
+                  "container": null
+                }
+        }
+    }
+}

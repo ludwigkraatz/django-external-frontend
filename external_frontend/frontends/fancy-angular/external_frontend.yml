@@ -1,0 +1,7 @@
+requirejs:
+    "paths":
+        "fancyFrontendConfigFile": "fancyPlugin!lib:fancy-frontend/widgetsConfig.json"
+        "fancyFrontendConfig": "fancyPlugin!lib:fancy-frontend/config"
+        "fancyFrontendCore": "fancyPlugin!lib:fancy-frontend/core"
+        "fancyAjax": "fancyPlugin!lib:fancy-frontend/ajax"
+        "fancyWidgetCore": "fancyPlugin!lib:fancy-frontend/widgets"
