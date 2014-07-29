@@ -533,7 +533,7 @@ define(['fancyPlugin!fancyWidgetCore', 'fancyPlugin!fancyAjax', 'fancyPlugin!fan
 
         },
 
-        _load_widget: function ($widget) {
+        _load_widget: function ($widget, apply_method, js) {
                 throw Error("not implemented")
         },
 

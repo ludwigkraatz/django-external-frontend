@@ -57,11 +57,12 @@ function isDefined(args) {
                       };
                       var thisChangeId = ++changeCounter;
 
-                      var prepareTemplate = function(response){
+                      var prepareTemplate = function(response, js){
 
                           if (thisChangeId !== changeCounter) return;
                           var newScope = scope.$new();
                           ctrl.template = response;//$sce.trustAsHtml(response);
+                          ctrl.js = js;
                           //ctrl.templateUrl = widgetConfig.widgetIdentifier;
 
                           // Note: This will also link all children of ng-include that were contained in the original
@@ -90,13 +91,13 @@ function isDefined(args) {
 
                       var cachedTemplate = $templateCache.get(widgetIdentifier);
                       if (cachedTemplate) {
-                        prepareTemplate(cachedTemplate);
+                        prepareTemplate(cachedTemplate[0], cachedTemplate[1]);
                       }else
                       if (src) {
                         // TODO: require:plugin!src
-                          require(['fancyPlugin!template:'+ src +':'+ src, 'fancyPlugin!css:' + src, 'fancyPlugin!widget:' + src], function(response){
-                              $templateCache.put(widgetIdentifier, response)
-                              prepareTemplate(response);
+                          require(['fancyPlugin!template:'+ src +':'+ src, 'fancyPlugin!css:' + src, 'fancyPlugin!widget:' + src], function(response, css, js){
+                              $templateCache.put(widgetIdentifier, [response, js])
+                              prepareTemplate(response, js);
                             }, function() {
                               if (thisChangeId === changeCounter) {
                                 prepareTemplate(widgetLoadErrorHandler());
@@ -160,7 +161,7 @@ function isDefined(args) {
 
 
                     // init widget
-                    frontendCore.addWidget(elm, elm.attr('load-widget'), apply);
+                    frontendCore.addWidget(elm, elm.attr('load-widget').split(':')[0], apply, ctrl.js);
                 },
                 restrict: 'ACE',
                 priority: -400,

@@ -184,13 +184,16 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         },
 
 
-        _load_widget: function ($widget, widget_name, apply_method) {
+        _load_widget: function ($widget, widget_name, apply_method, js) {
 
             if (widget_name === undefined) {
                 widget_name = $widget.attr('load-widget');
             }
+            if (widget_name.search(':') != -1) {
+                widget_name = widget_name.split(':')[0]
+            }
 
-            $[this.config.appName][widget_name]({'apply_method': apply_method}, $widget)
+            js[this.config.appName][widget_name]({'apply_method': apply_method}, $widget)
 
         }
     });
