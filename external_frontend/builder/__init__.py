@@ -207,6 +207,7 @@ class FrontendBuilder(object):
             config[key] = self.get_config(key)
 
         config['start']['apps'] = {}
+        host = 'http://localhost:8000/api/'
         for app, app_config in self.get_config('apps', default={}).items():
             if not isinstance(app_config, dict):
                 app_config = {}
@@ -230,8 +231,8 @@ class FrontendBuilder(object):
                 'localesUrl': None,
                 'htmlUrl': None
             }
-
-        config['requirejs']['baseUrl'] = host + 'frontend/static/'
+        static_host = host + 'frontend/static/'
+        config['requirejs']['baseUrl'] = static_host
         return config
 
     def generate_build_path(self, orig_path):
