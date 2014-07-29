@@ -206,12 +206,12 @@ class FrontendBuilder(object):
         for key in ['debug_level']:
             config[key] = self.get_config(key)
 
-        host = '/api/'
         config['start']['apps'] = {}
         for app, app_config in self.get_config('apps', default={}).items():
             if not isinstance(app_config, dict):
                 app_config = {}
 
+            host = app_config.get('base_url', '/api/')
             config['start']['apps'][app] = {
                 'init': {
                     'host': host,
