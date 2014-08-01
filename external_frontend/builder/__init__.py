@@ -365,8 +365,11 @@ class FrontendBuilder(object):
 
         compile_as = None
         if path.endswith('.sass'):
-            compile_as = 'scss'
+            compile_as = 'sass'
             path = path.replace('.sass', '.css')
+        elif path.endswith('.scss'):
+            compile_as = 'scss'
+            path = path.replace('.scss', '.css')
         new_path = self.get_build_path(path)
         if new_path is not None:
 
@@ -385,6 +388,9 @@ class FrontendBuilder(object):
                 'compress': False,
                 'debug_info': True,#settings.DEBUG,
             }).compile(content)
+        if type == 'sass':
+            import sass
+            return sass.compile(string=content)
 
     def remove(self, path, storages, log=None, main_builder=None):
         """
