@@ -382,15 +382,15 @@ class FrontendBuilder(object):
             log.write('ignored')
 
     def compile(self, type, content):
+        if type == 'sass':
+            import isass
+            return self.compile('scss', isass.get_scss(content))
         if type == 'scss':
             import scss
             return scss.Scss(scss_opts={
                 'compress': False,
                 'debug_info': True,#settings.DEBUG,
             }).compile(content)
-        if type == 'sass':
-            import sass
-            return sass.compile(string=content)
 
     def remove(self, path, storages, log=None, main_builder=None):
         """
