@@ -12,10 +12,10 @@ for requirement in parse_requirements('requirements.txt'):
 
 
 setup(
-    name="external_frontend",
+    name="external-frontend",
     author="Ludwig Kraatz",
     author_email="code@suncircle.de",
-    version='0.1.1',
+    version='0.1.2',
     packages=find_packages(),
     include_package_data=True,
     install_requires=requirements,
