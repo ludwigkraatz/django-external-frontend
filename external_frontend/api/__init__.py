@@ -10,7 +10,7 @@ def get_default_endpoint():
         default_frontend_endpoint = api_root.register_endpoint('frontend', namespace='frontend', active=True)
     return default_frontend_endpoint
 
-if settings.DEBUG:
+if settings.STATICS_OVER_API:
     for name, frontend in settings.FRONTEND_COLLECTION.items():
         frontend_settings = settings.with_configuration({
             'FRONTEND': frontend

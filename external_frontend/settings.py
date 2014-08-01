@@ -15,6 +15,8 @@ config = {
     'SETTINGS': {
         'DEBUG': None,  # if None, it returns the global DEBUG value
 
+        'STATICS_OVER_API': None,  # if None, returns the global DEBUG value
+
         'FRONTEND': {
             'NAME': None,
             'PREFIX': None,  # used as root folder in storage as well as in statics server name
@@ -50,6 +52,7 @@ config = {
 
     'DEFAULTS': {
         'DEBUG': django_settings.DEBUG,
+        'STATICS_OVER_API': django_settings.DEBUG,
         # unwrapped getter: app_settings.init.get_instance
         '_INIT_METHOD': 'app_settings.init.get_wrapped_instance',
 
@@ -126,3 +129,74 @@ config = {
 
 
 settings = app_settings(config)
+
+#DEFAULTS FOR OTHER SETTINGS
+"""
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'introspective_api.authentication.HawkAuthentication',
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+#        'expn_fw.contrib.api.renderers.ExpnJSONRenderer_v1_0',
+#        'expn_fw.contrib.api.renderers.ExpnJSONEmbeddedResultRenderer',
+        'rest_framework.renderers.JSONRenderer',
+        'expn_fw.contrib.api.renderers.DynamicTemplateHTMLRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
+#    'DEFAULT_CONTENT_NEGOTIATION_CLASS':
+#        'expn_fw.contrib.api.negotiation.VersionNegotiation',
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+#        'expn_fw.contrib.api.parsers.EXPNVersionJSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser'
+    )
+}
+INTROSPECTIVE_API = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'introspective_api.authentication.HawkAuthentication',
+        ),
+    'RESPONSE_LINK_HEADER': 'exclusive',
+    'PAGINATION_IN_HEADER': True,
+    'AUTH_CONSUMER_MODEL':
+        'expn_fw.contrib.api.models.Consumer',
+    'AUTH_ACCESS_KEY_MODEL':
+        'expn_fw.contrib.api.models.AccessKey'
+}
+
+
+MIDDLEWARE_CLASSES = (
+        
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
+    'django.middleware.http.ConditionalGetMiddleware',
+    'django.middleware.cache.UpdateCacheMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    #'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
+    
+    #'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'introspective_api.middleware.HAWK_Authentication',  
+    'introspective_api.middleware.API_User_Middleware',   
+    'introspective_api.middleware.API_Client_Middleware',    
+    'expn_fw.contrib.terms_of_service.middleware.AcceptTOSMiddleware',
+    
+    
+    ###'expn.base.middleware.AuthenticationMiddleware',
+    #'django.contrib.messages.middleware.MessageMiddleware',
+    'expn_fw.contrib.dynamic_page.middleware.ViewNameMiddleware',
+    ###'expn.core.middleware.DebugException'
+    #'snippetscream.ProfileMiddleware',
+    #'expn.middleware.SSLMiddleware',
+    #'expn.middleware.StrictAuthentication',
+    #'expn.middleware.AutoLogout',
+    'expn_fw.core.permissions.middleware.PermissionCheckerMiddleware',
+    'expn_fw.contrib.dynamic_page.middleware.ResponseMiddleware',
+)
+
+INSTALLED APPS
+    'corsheaders',
+"""
