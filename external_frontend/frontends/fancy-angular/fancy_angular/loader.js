@@ -193,7 +193,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 widget_name = widget_name.split(':')[0]
             }
 
-            js[this.config.appName][widget_name]({'apply_method': apply_method}, $widget)
+            js[this.config.appName][widget_name]({'apply_method': apply_method, 'widgetCore': this}, $widget)
 
         }
     });
