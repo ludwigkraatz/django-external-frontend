@@ -16,5 +16,5 @@ setup(
     version='0.1',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=read('requirements.txt').split("\n"),
+    #install_requires=read('requirements.txt').split("\n"),
 )
