@@ -150,7 +150,9 @@ function isDefined(args) {
                         if (callback){callback(content);}
 
                         // apply angular
-                        scope.$apply();
+                        if(!scope.$$phase) {
+                            scope.$apply();
+                        }
                     }
                     if (ctrl.template) {
                         apply(ctrl.template, function(content){
