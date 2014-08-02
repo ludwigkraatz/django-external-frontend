@@ -1,0 +1,2 @@
+include *.txt README.md LICENSE
+recursive-include *.html *.css *.sass *.scss *.js *.py *.po *.mo *.json
