@@ -1,2 +1,2 @@
 include *.txt README.md LICENSE
-recursive-include external_frontend *.html *.css *.sass *.scss *.js *.py *.po *.mo *.json
+recursive-include external_frontend *.html *.css *.sass *.scss *.js *.py *.po *.mo *.json *.yml
