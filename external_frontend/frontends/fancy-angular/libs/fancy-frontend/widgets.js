@@ -128,7 +128,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                         /* define vars */
                         this.$form = this.element.find(widgetConfig.selector_elements_form);
                         this.$preview = this.element.find(widgetConfig.selector_elements_previewContent);
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
 
                         /* remove all listeners for the editor widget */
                         this.element.off(widgetConfig.selector_widgets_editor);
@@ -185,7 +185,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                         return function(event){
                             var data = {};
                             var data_set = false;
-                            var widgetCore = this.element.data('fancyWidgetCore');
+                            var widgetCore = this.options.widgetCore;
                             $this.$form.find('input, textarea, select').each(function(index, elem){
                                 var $elem = $(elem);
                                 var val = $elem.val();
@@ -340,7 +340,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                         }
 
                         this.element.off(widgetConfig.selector_widgets_popup);
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
 
                         var $this = this;
                         var $popup = this.element;
@@ -470,21 +470,23 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
 
                     _create: function() {
 
-                        if (! this.element.hasClass(widgetConfig.name_classes_widgets_list)) {
-                            throw new Error('the target for "' + widgetConfig.name_widgets_list + '" widget needs to have a "'+ widgetConfig.name_classes_widgets_list +'" class');
-                        }
+                        //if (! this.element.hasClass(widgetConfig.name_classes_widgets_list)) {
+                        //    throw new Error('the target for "' + widgetConfig.name_widgets_list + '" widget needs to have a "'+ widgetConfig.name_classes_widgets_list +'" class');
+                        //}
 
-                        if (this.options.endpoint == undefined) {
+                        /*if (this.options.endpoint == undefined) {
                             throw new Error('"' + widgetConfig.name_widgets_list + '" needs to have an endpoint option');
                         }
 
                         if (this.options.list_url == undefined) {
                             throw new Error('"' + widgetConfig.name_widgets_list + '" needs to have a list_url option');
-                        }
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        }*/
+                        var widgetCore = this.options.widgetCore;
 
                         //this.element.data('current_page', 1);
                         //this.updatePagination(1, this.get_lastPage())
+                        // TODO: clone children as template
+                        this.element.children().remove();
 
                         this.element.off(widgetConfig.selector_widgets_list, this.get_reload_handler(this));
 
@@ -682,7 +684,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
 
                     goToPage: function(page, letter){
                         var page_nr = parseInt(page);
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
 
                         var data = {
                             'page': page_nr
@@ -699,13 +701,13 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                         this.element.attr(config.frontend_generateAttributeName('current-page'), page);
                         this.element.attr(config.frontend_generateAttributeName('current-letter'), letter);
                         this.element.triggerHandler(widgetConfig.name_event_loadingStart);
-                        this.options.endpoint.get({
+                        /*this.options.endpoint.get({
                             url: this.options.list_url,
                             done: this.get_showList_handler(this, page_nr, letter),
                             data: data,
                             fail: widgetCore.get_failed_xhr_handler(config.dialog_generateWording('widget:list_inquiries:action:load_inquiries'), this),
                             //cache: false
-                        })
+                        })*/ // TODO: FIX
                     },
 
                     get_reload_handler: function($this){
@@ -798,7 +800,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                             //update_bindings($entry_container)
                             $entry_container.children().show_inquiry({load_content:false})
                         }
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
                         var data = {};
                         data[this.options.entry_kwarg]=elem;
                         this.element.triggerHandler(widgetConfig.name_event_loadingStart);
@@ -811,7 +813,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                     },
 
                     get_showList_handler: function($this, page, letter){
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
                         return function(data, status, jqXHR){
                             $this.element.find(widgetConfig.selector_widgets_list +'-container').find(widgetConfig.selector_widgets_list +'-entry').each(function(index, elem){
                                 var $elem = $(elem);
@@ -1000,14 +1002,21 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
 
                         this.element.data('__initialized', true); // otherwise widgetCore.scan() would initialize it again
 
-                        this.apply = this.options.apply_method;
+                        this.apply = function($target){
+                            //if (!$target.data('__initialized')) {
+                                return this.options.apply_method.apply(this, arguments)
+                            //}
+                        }
+                        if (this.options.content) {
+                            this.element.html(this.options.content)
+                        }
 
                         this.element.off(widgetConfig.selector_widgets_core);
                         this.element.on(widgetConfig.name_event_loadingFailed + widgetConfig.selector_widgets_core, this.get_initFailed_handler(this));
                         this.element.on(widgetConfig.name_event_loading + widgetConfig.selector_widgets_core, this.get_loadingWidget_handler(this));
                         this.element.on(widgetConfig.name_event_init + widgetConfig.selector_widgets_core, this.get_initWidgetDone_handler(this));
                         this.element.on(widgetConfig.name_event_tosDenied + widgetConfig.selector_widgets_core, this.get_ToSDenied_handler(this));
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
                         if (widgetCore) {
                             this.element.on(widgetConfig.name_event_notification + widgetConfig.selector_widgets_core, widgetCore.get_notification_handler(this));
                         }
@@ -1100,7 +1109,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
 
 
                     get_initFailed_handler: function($this){
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
                         return function (event, jqXHR, status, statusText){
                             event.stopPropagation();
                             error = widgetCore.ajax.translateResponse_toJSON(jqXHR);
@@ -1157,7 +1166,7 @@ define(['fancyPlugin!jquery-ui', 'fancyPlugin!fancyFrontendConfig', 'json'], fun
                         if (! this.element.hasClass(widgetConfig.name_classes_widgets_form)) {
                             throw new Error('the target for "' + widgetConfig.name_widgets_form + '" widget needs to have a "'+ widgetConfig.name_classes_widgets_form +'" class');
                         }
-                        var widgetCore = this.element.data('fancyWidgetCore');
+                        var widgetCore = this.options.widgetCore;
 
                         this.init_inputs();
 
