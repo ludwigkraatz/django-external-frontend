@@ -312,6 +312,25 @@ define(function(base){
       }
     },
 
+    load_fixture: function(config, name){
+
+      this.validate(config, 'fixture');
+
+      var structure = config.structure;
+
+      var fixture = this.value(name);
+
+      var path = structure.fixture.path
+        .replace(/{fixture}/g, fixture)
+        .replace(/{widget}/g, fixture)
+        .replace(/{app}/g, this.getCurrentApp(config));
+
+      return {
+        reqPath: this.path(path, config, 'js'),
+        reqPlugin: 'json'
+      }
+    },
+
     load_locale: function(config, name){
         var result = {};
         var container = 'fancy-frontend'; // default
@@ -331,7 +350,7 @@ define(function(base){
           .replace(/{app}/g, this.getCurrentApp(config));
 
         result.reqPath = this.path(path, config, 'locales');
-        result.reqPlugin = 'text';
+        result.reqPlugin = 'json';
         return result
     },
 
@@ -366,7 +385,7 @@ define(function(base){
 
         var data = this.resolveTargets(config, name+'.json');
         var data = this.handlePlugin(config, data.fancyPlugin, data.target);
-        data.reqPlugin = 'text';
+        data.reqPlugin = 'json';
         return data
     },
 
@@ -375,6 +394,17 @@ define(function(base){
       this.validate(config, 'widget');
 
       var structure = config.structure;
+        var parts = name.split(':');
+        var app;
+        if (parts.length == 1) {
+            name = name;
+            app = this.getCurrentApp(config);
+        }else if (parts.length == 2) {
+            name = parts[1];
+            app = parts[0];
+        }else{
+            throw Error ('"' + name + '" is not a valid widget syntax')
+        }
 
       var widget = this.value(name);
       var file = this.value(name);
@@ -382,7 +412,7 @@ define(function(base){
       var path = structure.widget.path
         .replace(/{widget}/g, widget)
         .replace(/{file}/g, file)
-        .replace(/{app}/g, this.getCurrentApp(config));
+        .replace(/{app}/g, app);
 
       return {
         reqPath: this.path(path, config, 'js')
@@ -551,17 +581,34 @@ define(function(base){
         if (config.defaults && config.defaults[name] !== undefined) {
             return config.defaults[name];
           }
-          return name;
+          return name;  
     },
 
     load: function (name, req, onload, config) {
         this.validate(config, 'plugin');
+        var parseJson = false;
 
         result = this.handleRequest(req, onload, config, name);
+        if (result.reqPlugin == 'json') {
+            result.reqPlugin = 'text';
+            parseJson = true;
+        }
         var dep = result.reqPlugin ? (result.reqPlugin +'!'+ result.reqTarget) : result.reqTarget;
 
-         require(result.reqConfig, [dep], function(value){
-           onload(value);
+         require(result.reqConfig, [dep], function(value){   
+            var proceed = function(data){
+                onload(data);
+            }
+            
+            if ((parseJson) && (typeof value == typeof 'string')) {
+                require(['json'], function(json){
+                    value = json.parse(value);
+                    proceed(value);
+                });
+            }else{
+                proceed(value);
+            }
+           
          });
     }
   }

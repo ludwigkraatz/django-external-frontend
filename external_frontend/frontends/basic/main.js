@@ -48,6 +48,10 @@ require.config({
           "path": "/{app}/widgets/{widget}/{widget}{theme}.css",
           "module": "css"
         },
+        "fixture": {
+          "path": "/{app}/widgets/{widget}/fixtures/{fixture}.json",
+          "module": "js"
+        },
         "locale": {
           "path": "/{app}/{container}/{locale}.json",
           "module": "locales",
