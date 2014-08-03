@@ -184,16 +184,22 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         },
 
 
-        _load_widget: function ($widget, widget_name, apply_method, js) {
-
+        _load_widget: function ($widget, response, widget_name, apply_method, js, scope) {
             if (widget_name === undefined) {
                 widget_name = $widget.attr('load-widget');
             }
             if (widget_name.search(':') != -1) {
                 widget_name = widget_name.split(':')[0]
             }
-
-            js[this.config.appName][widget_name]({'apply_method': apply_method, 'widgetCore': this}, $widget)
+            
+            if ($widget.data('__initialized')){
+                js('options', {'apply_method': apply_method, 'widgetCore': this, 'scope': scope, 'content': response})
+            }else{
+                if (!js) {
+                    return false
+                }
+                js({'apply_method': apply_method, 'widgetCore': this, 'scope': scope, 'content': response}, $widget)
+            }
 
         }
     });
