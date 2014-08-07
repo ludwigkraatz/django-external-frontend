@@ -134,7 +134,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
 
           var cachedTemplate = $templateCache.get(widgetIdentifier);
           if (cachedTemplate) {
-            prepareTemplate(cachedTemplate[0], cachedTemplate[1]);
+            prepareTemplate(cachedTemplate[0], cachedTemplate[1], undefined, true);
           }else
           if (src) {
             // TODO: require:plugin!src
@@ -172,7 +172,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                     scope.$emit('$includeContentError');*/
               });
             }else{
-                prepareTemplate(null, $[frontendConfig.widgets.defaults_namespace], false, true); // keepScope, skipApply
+                prepareTemplate(null, $[frontendConfig.widgets.defaults_namespace], undefined, true); // keepScope, skipApply
             }
 
             scope.$emit('$includeContentRequested');
