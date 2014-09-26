@@ -16,6 +16,7 @@ config = {
         'DEBUG': None,  # if None, it returns the global DEBUG value
 
         'STATICS_OVER_API': None,  # if None, returns the global DEBUG value
+        'CACHE_ROOT': None,
 
         'FRONTEND': {
             'NAME': None,
@@ -35,6 +36,7 @@ config = {
         'WORDING_HANDLER_COLLECTION': {},
         'BUILDER': {
             'NAME': None,
+            'SRC_NAME': None,
             'SRC': None,
             'DEPENDS_ON': [],
             'FILTER': None,
@@ -71,24 +73,32 @@ config = {
             'CLASS': 'external_frontend.storage.DevelopmentStorage'
         },
         'BUILDER': {
+            'SRC_NAME': '',
             'CLASS': 'external_frontend.builder.FrontendBuilder',
-            'DEPENDS_ON': []
+            'DEPENDS_ON': [],
+            'TYPE': 'frontend',
+            'FILTER': ''
         },
         'BUILDER_COLLECTION': {
             'basic-frontend': {
+                'NAME': 'basic-frontend',  # TODO: settings should set this automatically
                 'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'basic'),
                 #'DEPENDS_ON': ['fancy-frontend-lib'],
                 'PROTECTED': True
             },
-            'fancy-angular': {
-                'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'fancy-angular'),
+            'fancy-frontend': {
+                'NAME': 'fancy-frontend',
+                'SRC': 'git@github.com:ludwigkraatz/fancy-frontend.git@4acd4f976f93c701a57be6af65c747e99f5a766d',
+                'FILTER': '^fancy-frontend/',
                 'DEPENDS_ON': ['basic-frontend'],
+                'TYPE': 'app',
                 'PROTECTED': True
             },
-            'fancy-frontend-lib': {
-                'SRC': 'git@github.com:ludwigkraatz/fancy-frontend.git',
-                'FILTER': '^fancy-frontend/',
-                'TYPE': 'lib',
+            'fancy-angular': {
+                'NAME': 'fancy-angular',
+                'SRC_NAME': 'fancy_angular',
+                'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'fancy-angular'),
+                'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             }
         }
