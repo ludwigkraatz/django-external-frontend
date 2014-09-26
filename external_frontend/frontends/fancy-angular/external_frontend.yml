@@ -1,7 +1,14 @@
 requirejs:
     "paths":
-        "fancyFrontendConfigFile": "fancyPlugin!lib:fancy-frontend/widgetsConfig.json"
-        "fancyFrontendConfig": "fancyPlugin!lib:fancy-frontend/config"
-        "fancyFrontendCore": "fancyPlugin!lib:fancy-frontend/core"
-        "fancyAjax": "fancyPlugin!lib:fancy-frontend/ajax"
-        "fancyWidgetCore": "fancyPlugin!lib:fancy-frontend/widgets"
+        "fancyAjax": "fancyPlugin!app:fancy-frontend:ajax"
+        "fancyFrontendConfigFile": "fancyPlugin!app:fancy-frontend:defaultConfig.json"
+        "fancyFrontendConfig": "fancyPlugin!app:fancy-frontend:config"
+        "fancyFrontendConfiguration": "fancyPlugin!app:fancy-frontend:configuration"
+        "fancyFrontendCore": "fancyPlugin!app:fancy-frontend:frontend"
+        "fancyWidgetCore": "fancyPlugin!app:fancy-angular:widgets"
+        "fancyWidgetMixins": "fancyPlugin!app:fancy-frontend:widgetMixins"
+        "fancyWidgetViews": "fancyPlugin!app:fancy-frontend:widgetViews"
+        "introspective-api-client": "js/libs/introspective_api/client"
+        "introspective-api-object": "js/libs/introspective_api/object"
+        "introspective-api-endpoint": "js/libs/introspective_api/endpoint"
+

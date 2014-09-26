@@ -5,7 +5,7 @@ unversioned:
     - ./require-text.js
     - /img/
 collect:
-    /requirejs-plugins/: lib!requirejs/plugins/
+    /requirejs-plugins/: lib:requirejs/plugins/
 staging:
     configurations:
         debug:

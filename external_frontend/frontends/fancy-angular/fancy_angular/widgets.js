@@ -1,9 +1,9 @@
-define(['fancyPlugin!fancyWidgetCore', 'fancyPlugin!fancyFrontendConfig', 'fancyPlugin!services'], function($, config, services){
+define(['fancyPlugin!app:fancy-frontend:widgets', 'fancyPlugin!fancyFrontendConfig', 'fancyPlugin!services'], function($, config, services){
     $(function() {
 
-        var widgetConfig = $[config.widgets.defaults_namespace]._widgetConfig;
+        var widgetConfig = $[config.apps['fancy-angular'].defaults_namespace]._widgetConfig;
 
-            $.widget( config.widgets.namespace + '.core', $[config.widgets.defaults_namespace].core, {
+            $.widget( config.apps['fancy-angular'].namespace + '.core', $[config.apps['fancy-frontend'].namespace].core, {
                     options: {
                     },
 
@@ -11,7 +11,7 @@ define(['fancyPlugin!fancyWidgetCore', 'fancyPlugin!fancyFrontendConfig', 'fancy
                         var $element = this.element;
                         var $this = this;
                         this._superApply( arguments );
-
+/*
                         $this.scope = this.options.scope;
                         if (!this.scope.widgetView) {
                             this.scope.widgetView = this.scope.defaultWidgetView;
@@ -34,7 +34,7 @@ define(['fancyPlugin!fancyWidgetCore', 'fancyPlugin!fancyFrontendConfig', 'fancy
                             // TODO: trigger event init_done
                         }
                         
-                        
+                        */
 
                         
                     },
@@ -101,7 +101,7 @@ define(['fancyPlugin!fancyWidgetCore', 'fancyPlugin!fancyFrontendConfig', 'fancy
                     }
 
             });
-            $.widget( config.widgets.defaults_namespace + '.widget',{
+            $.widget( config.apps['fancy-angular'].namespace + '.widget',{
                     options: {
                     },
 

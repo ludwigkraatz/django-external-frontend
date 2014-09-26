@@ -5,20 +5,22 @@ define(['fancyPlugin!angular'], function (angular) {
 
   // Demonstrate how to register services
   // In this case it is a simple value service.
-	return angular.module('services', [])
+	return angular.module('services', ['config'])
 		.value('version', '0.1')
-        .provider('DataProvider', function() {
+        .provider('$ObjectProvider', ['frontendCore', function(frontendCore) {
     // In the provider function, you cannot inject any
     // service or factory. This can only be done at the
     // "$get" method.
 
-    this.stage = 'fixtures';
+    this.stage = 'productive';
 
     this.$get = function($q) {
-        var stgae = this.stage;
+        var stage = this.stage;
         return {
-            get: function(type, selector) {
-                if (stgae == 'fixtures') {
+            get: function(settings) {
+                var type = settings.target,
+                    selector = settings.data;
+                if (stage == 'fixtures') {
                     var src = type;
                     var deferred = $q.defer();
                     require(['fancyPlugin!fixture:'+ src +':'+ src], function(result){
@@ -46,13 +48,13 @@ define(['fancyPlugin!angular'], function (angular) {
                         deferred.reject();
                     });
                     return deferred.promise
-                }else{
-                    return $http.get('/foos')
-                       .then(function(result) {
-                            //resolve the promise as the data
-                            return result.data;
-                        });
+                }else{// frontendCore.endpoint
+                    return frontendCore.endpoint.ajax.access('object').get(settings)
                 }
+            },
+            fromFixture: function(content){
+                // directives.js, line 84,
+                // maybe even give fixtures down to api object
             }
         }
     };
@@ -60,5 +62,5 @@ define(['fancyPlugin!angular'], function (angular) {
     this.setStage = function(stage) {
         this.stage = stage;
     };
-});
+}]);
 });

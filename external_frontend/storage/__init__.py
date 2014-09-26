@@ -98,7 +98,36 @@ class FileStorage(Storage):
             raise self.PathNotFound()
 
 
-class DevelopmentStorage(FileStorage):
+class StaticsStorage(FileStorage):
+
+    def clean(self, **config):
+        super(StaticsStorage, self).clean()
+        # TODO: if statics
+        from django.core.management import call_command
+        call_command('collectstatic', link=True, interactive=False, stdout=config.get('log', None))
+
+    def get(self, path, requirejsFallback=False):
+        class request(object):  # mockup
+            META = {'HTTP_IF_MODIFIED_SINCE': None}
+
+        try:
+            return super(StaticsStorage, self).get(path, requirejsFallback)
+        except self.PathNotFound:
+            from django.contrib.staticfiles.views import serve
+            from django.utils.six.moves.urllib.request import url2pathname
+            from django.http import Http404
+            if requirejsFallback:
+                if os.path.exists(os.path.join(self.root, '.'.join(path.split('.')[0:-1]))):
+                    path = '.'.join(path.split('.')[0:-1])
+            try:
+                return serve(request, path, insecure=True)
+            except Http404:
+                pass
+
+            raise self.PathNotFound()
+
+
+class DevelopmentStorage(StaticsStorage):
     def get_version(self, *args, **kwargs):
         return 1
 

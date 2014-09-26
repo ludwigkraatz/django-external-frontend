@@ -5,7 +5,7 @@
  */
 define(['fancyPlugin!angularTranslate'], function(){
     return angular.module("pascalprecht.translate").
-        factory("$translateStaticFilesLoader",
+        factory("$fancyAngularLocalesLoader",
                 ["$q","$http",
                  function($q,$http){var a=$q, b=$http;
                     return function(c){

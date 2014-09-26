@@ -18,18 +18,32 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 }
         },
         prepare_app: function(){
-
+            var $this = this;
             /* preparing the widgets */
             var selector = this.config.selector;
             var appName = this.config.appName;
+            var namespace = this.config.widgets.namespace;
 
             $(selector).each(function(index, element){
                 var $widget = $(element);
-                $widget.html('<div class="'+appName+'-loading"></div>');
+                var widgetName = $widget.attr('load-'+appName);
+                //$widget.html('<div class="'+appName+'-loading"></div>');
 
-                $widget.attr('load-widget', $widget.attr('load-'+appName));
-                $widget.attr('load-'+appName, undefined)
+                $this.create_widget($widget, namespace+'.'+widgetName)
+                $widget.attr('load-'+appName, undefined);
             })
+        },
+        set_options: function ($widget, options){
+            $widget.data(this.config.appName + '-widget-options', $.extend({}, options));
+        },
+        create_widget: function($widget, widgetName, options){
+            $widget.attr('load-widget', widgetName);
+            // TODO: maybe wrap this.$($widget) to enable having a private scope in the loader application
+            if (options)this.set_options($widget, options);
+        },
+        create_plugin: function($widget, widgetName, options){
+            $widget.attr('load-plugin', widgetName);
+            if (options)this.set_options($widget, options);
         },
         init_app: function(){
             var coreApp = this;
@@ -45,18 +59,18 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                     angularTranslateServiceStorage: 'fancyPlugin!lib:angular/translate/v2/service/storage-key',
                     angularTranslateFilter: 'fancyPlugin!lib:angular/translate/v2/filter/translate',
                     angularTranslateDirective: 'fancyPlugin!lib:angular/translate/v2/directive/translate',
-                    angularTranslateStaticsLoader: 'fancyPlugin!app:fancy_angular:plugins/angular-locales-loader',
+                    angularTranslateStaticsLoader: 'fancyPlugin!app:fancy-angular:plugins/angular-partial-locales-loader',
                     angular: "fancyPlugin!lib:angular/angular",
 
-                    appConfig: 'fancyPlugin!app:fancy_angular:config',
-                    filters: 'fancyPlugin!app:fancy_angular:filters',
-                    services: 'fancyPlugin!app:fancy_angular:services',
-                    directives: 'fancyPlugin!app:fancy_angular:directives',
-                    controllers: 'fancyPlugin!app:fancy_angular:controllers',
-                    routes: 'fancyPlugin!app:fancy_angular:routes',
+                    appConfig: 'fancyPlugin!app:fancy-angular:config',
+                    filters: 'fancyPlugin!app:fancy-angular:filters',
+                    services: 'fancyPlugin!app:fancy-angular:services',
+                    directives: 'fancyPlugin!app:fancy-angular:directives',
+                    controllers: 'fancyPlugin!app:fancy-angular:controllers',
+                    routes: 'fancyPlugin!app:fancy-angular:routes',
 
-                    currentApp: 'fancyPlugin!app:fancy_angular:sample_app',
-                    "locale-global": 'fancyPlugin!locale:fancy_angular:locale.global',
+                    currentApp: 'fancyPlugin!app:fancy-angular:sample_app',
+                    "locale-global": 'fancyPlugin!locale:fancy-angular:locale.global',
                 },
                 shim: {
                     'angular' : {
@@ -132,9 +146,13 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         initEndpoints: function(){
 
             settings = this.config;
-
+            console.log('(init)', '[frontendCore]:', this);
             this.authEndpointHost = settings.init.host;
 
+            this.endpoint = this.new_ajax({
+                endpoint:   settings.init.host,
+                crossDomain: settings.init.crossDomain
+            });/*
             this.data = this.new_ajax({
                 endpoint:   settings.init.host,
                 type:       'data',
@@ -150,7 +168,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 type:       'content',
                 crossDomain: settings.init.crossDomain,
                 external:   true
-            });
+            });*/
 
         },
 
@@ -192,15 +210,66 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 widget_name = widget_name.split(':')[0]
             }
             
+            $widget.attr('data-' + this.config.prefix + '-widget-name', widget_name); // .slice(widget_name.search('>')+1)
+
+            var options = $($widget[0]).data(this.config.appName + '-widget-options') || {};
+            options['apply_method'] = apply_method;
+            options['widgetCore'] = this;
+            options['scope'] = scope;
+            options['content'] = options['content'] || response;
+            options['activeView'] =  scope.__defaultWidgetView;
+
             if ($widget.data('__initialized')){
-                js('options', {'apply_method': apply_method, 'widgetCore': this, 'scope': scope, 'content': response})
+                js('options', options)
             }else{
                 if (!js) {
                     return false
                 }
-                js({'apply_method': apply_method, 'widgetCore': this, 'scope': scope, 'content': response}, $widget)
+                js(options, $widget)
             }
 
+        },
+        
+        load_assets: function(settings){
+            for (var key in settings.templates){
+                var template = 'fancyPlugin!template:' + (settings.templates[key]+':'+settings.templates[key]);
+                settings.scope.__required.push(template);
+                require([template], function(response){
+                    if (settings.callback){
+                        settings.callback('template', settings.templates[key], response);
+                    }
+                });
+            }
+            for (var key in settings.locales){
+                settings.scope.addLocale(settings.locales[key]);
+                //if (promise.required) settings.scope.__required.push(promise.required);
+                // TODO: enable tracking of required locales
+                if (settings.callback){settings.callback('locale', settings.locales[key])};
+                
+            }
+            for (var key in settings.css){
+                // TODO: test if file is not loaded with core.css
+                var css = 'fancyPlugin!css:' + (settings.css[key]+':'+settings.css[key]);
+                settings.scope.__required.push(css);
+                require([css], function(response){
+                    if (settings.callback){
+                        settings.callback('css', settings.css[key], response);
+                    }
+                });
+            }
+            for (var key in settings.fixtures){
+                settings.scope.loadFixture(settings.fixtures[key]);
+                var fixture = 'fancyPlugin!fixture:' + (settings.fixtures[key]+':'+settings.fixtures[key]);
+                settings.scope.__required.push(fixture);
+                require([fixture, 'fancyPlugin!angular', 'fancyPlugin!currentApp', 'fancyPlugin!services'], function(fixture, angular, app){
+                    settings.scope.log.debug('loaded fixture', settings.fixtures[key], fixture)
+                    settings.scope.addFixture(settings.fixtures[key], fixture)
+                    settings.scope.$apply();
+                    if (settings.callback){
+                        settings.callback('fixture', settings.fixtures[key], fixture);
+                    }
+                });
+            }
         }
     });
     return FrontendCore
