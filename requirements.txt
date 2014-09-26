@@ -6,4 +6,4 @@ django-pipeline==1.3.24
 django-pipeline-compass==0.1.5
 isass==0.1.14
 scss == 0.8.73
--e git+git@github.com:gitpython-developers/GitPython.git@0e9eef45194039af6b8c22edf06cfd7cb106727a#egg=GitPython-0.3.2 RC1
+-e git+git@github.com:gitpython-developers/GitPython.git@0e9eef45194039af6b8c22edf06cfd7cb106727a#egg=GitPython-0.3.2.RC1
