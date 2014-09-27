@@ -200,6 +200,9 @@ class FrontendBuilder(object):
         """
         config['main_builder'] = self
         log = config.get('log')
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
         self.clean(**config)
         #0 init dependencies
         #dependency_log = log.with_indent("init dependencies")
