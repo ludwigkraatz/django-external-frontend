@@ -86,7 +86,7 @@ class FrontendBuilder(object):
         self.filter = settings.FILTER
 
         self.cache_dir = (externalFrontendSettings.CACHE_ROOT + os.path.sep + 'external_frontend.cache')
-        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote'
+        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote' + os.path.sep + self.name
 
         self.cache_dir_src = self.cache_dir + os.path.sep + 'src'
         self.cache_dir_frontend = self.cache_dir_src + os.path.sep + self.name
@@ -133,12 +133,32 @@ class FrontendBuilder(object):
         self.css_sources = SortedDict()
 
     def init_src(self, source):
-        if source.startswith('git@'):
-            self.src = self.cache_dir_frontend
+        if source.startswith('git@'):  # TODO: debug output (cloned to local repo / updated local repo)
             from git import *
-            #Repo.init(self.src, bare=True)
-            #repo.create_remote('test', 'git@server:repo.git')
-            #return  # TODO: complete init
+
+            commit = None
+            if '@' in source.split(':')[-1]:
+                parts = source.split('@')
+                source = '@'.join(parts[0:-1])
+                commit = parts[-1]
+
+            if not os.path.exists(self.cache_dir_remote + os.path.sep + '.git'):
+                repo = Repo.clone_from(source, self.cache_dir_remote)
+            else:
+                repo = Repo(self.cache_dir_remote)
+                if commit:
+                    branches = repo.git.execute(['git', 'branch', '--contains', commit])
+                    branch = branches.split('\n')[-1].strip()
+                else:
+                    branch = 'master'
+
+                repo.git.checkout(branch)  # TODO: is this the right/best way?
+                repo.remotes.origin.pull(branch)
+
+            if commit:
+                repo.git.checkout(commit)
+
+            self.src = self.cache_dir_remote
         else:
             self.src = source
 
