@@ -200,8 +200,9 @@ class FrontendBuilder(object):
         """
         config['main_builder'] = self
         log = config.get('log')
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+
+        if not os.path.exists(self.cache_dir_frontend):
+            os.makedirs(self.cache_dir_frontend)
 
         self.clean(**config)
         #0 init dependencies
@@ -212,9 +213,6 @@ class FrontendBuilder(object):
         if config.get('update', True):  # or build cache = empty
             if not os.path.exists(self.cache_dir_remote):
                 os.makedirs(self.cache_dir_remote)
-
-            if not os.path.exists(self.cache_dir_frontend):
-                os.makedirs(self.cache_dir_frontend)
 
             if not os.path.exists(self.cache_dir_built_css):
                 os.makedirs(self.cache_dir_built_css)
