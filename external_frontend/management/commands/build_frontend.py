@@ -18,12 +18,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        stdout = WrappedOutput(self.stdout, self.stderr)
+        output_level = None#1  # TODO: arg
+        stdout = WrappedOutput(self.stdout, self.stderr, output_level=output_level)
 
         started = 0
         selected_frontend = None  # TODO: as opt. argument
         for name, frontend in settings.FRONTEND_COLLECTION.items():
-            if not frontend.BUILDER:
+            main_builder = frontend.BUILDER
+            if not main_builder:
                 continue
             if selected_frontend and frontend.NAME != selected_frontend:
                 continue
@@ -33,13 +35,11 @@ class Command(BaseCommand):
 
             frontend_stdout.write('starting builder "%s"' % frontend.BUILDER, 'and watch for changes' if options['watch'] else '')
             if options['watch']:
-                if not frontend.BUILDER.watch(storages=frontend.USED_STORAGE, log=frontend_stdout):  # TODO: make this non-blocking
+                if not main_builder.watch(storages=frontend.USED_STORAGE, log=frontend_stdout):
                     frontend_stdout.write('builder "%s" couldnt start' % frontend.BUILDER.NAME)
             else:
-                if not frontend.BUILDER.build(storages=frontend.USED_STORAGE, log=frontend_stdout):  # TODO: make this non-blocking
+                if not main_builder.build(storages=frontend.USED_STORAGE, log=frontend_stdout):
                     frontend_stdout.write('builder "%s" couldnt succeed' % frontend.BUILDER.NAME)
-
-            frontend_stdout.write('done')
 
         if started == 0:
             raise CommandError("didn't find any FRONTENDs with defined BUILDER")
