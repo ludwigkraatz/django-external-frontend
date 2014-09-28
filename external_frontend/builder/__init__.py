@@ -1,5 +1,4 @@
 import os
-import time
 import sys
 import shutil
 import json
@@ -13,7 +12,7 @@ import re
 from django.utils.datastructures import SortedDict
 
 
-def launch_observer(storages, builder, src, log, main_builder):
+def generate_handler(storages, builder, src, log, main_builder):
     class Handler(FileSystemEventHandler):
         def prepare_path(self, path):
             path = os.path.relpath(path, src)
@@ -56,11 +55,7 @@ def launch_observer(storages, builder, src, log, main_builder):
                     log.write("Modified: " + path)
                     builder.update(path=path, content=content.read(), storages=storages, log=log.with_indent(), main_builder=main_builder)
 
-    event_handler = Handler()
-    observer = Observer()
-    observer.schedule(event_handler, src, recursive=True)
-    observer.start()
-    return observer
+    return Handler()
 
 
 class FrontendBuilder(object):
@@ -96,8 +91,9 @@ class FrontendBuilder(object):
         self.compile_dir = self.cache_dir + os.path.sep + 'compiled' + os.path.sep + self.name
 
         self.init_src(settings.SRC)
+        self.src_real = os.path.realpath(self.src)
 
-        self.observers = []
+        self.reset_observer()
 
         def get_dependencies():
             #raise Exception(str(settings.__dict__['_dict']))
@@ -177,16 +173,70 @@ class FrontendBuilder(object):
                 log.write('couldn\'t build dependency "%s"' % dependency)
         return config
 
-    def register_observers(self, observer):
-        if isinstance(observer, list):
-            self.observers += observer
-        else:
-            self.observers.append(observer)
-
     def init_dependencies(self, main_builder=None, **config):
         main_builder.dependency_map[self.name] = self
         for dependency in self.get_dependencies():
             dependency.init_dependencies(main_builder=main_builder)
+
+    def register_handler(self, event_handler):
+        if self.observer is None:
+            self.observer = Observer()
+            self.observer.start()
+
+        return self.observer.schedule(event_handler, self.src_real, recursive=True)
+
+    def reset_observer(self):
+        if hasattr(self, 'observer') and self.observer:
+            self.observer.unschedule_all()
+            self.observer.stop()
+            self.observer.join()
+
+        self.observer = None
+        self.observers_watcher = {}
+
+    def init_observers(self, **config):
+        started = 0
+        main_builder = config.get('main_builder', None)
+        for dependency in self.get_dependencies():
+            started += dependency.init_observers(**config)
+
+        if main_builder in self.observers_watcher:
+            raise Exception('handler for "%s" on "%s" already registered' % (main_builder, self.name))
+
+        handler = config.get('launcher')(
+            config.get('storages'),
+            self,
+            self.src_real,
+            log=config['log'].async(),
+            main_builder=config.get('main_builder')
+        )
+
+        self.observers_watcher[config.get('main_builder', None)] = (handler, self.register_handler(handler))
+        started += 1
+        config['log'].write('started observer for "%s" on %s' % (self.name, self.src_real))
+        return started
+
+    def stop_watching(self, log, main_builder=None):
+        main_builder = main_builder or self
+        for dependency in self.get_dependencies():
+            dependency.stop_watching(log=log, main_builder=main_builder)
+
+        if main_builder in self.observers_watcher:
+            self.observer.remove_handler_for_watch(*self.observers_watcher[main_builder])
+            del self.observers_watcher[main_builder]
+            log.write('remove watcher "%s"' % (self.name))
+            if not self.observers_watcher:
+                log.write('resetting', self.name)
+                self.reset_observer()
+
+    def watch(self, **config):
+        config['watch'] = True
+        log = config['log']
+        if self.build(**config):
+            return True
+        else:
+            log.write('no observers started, because build failed')
+            return False
 
     def build(self, **config):
         """
@@ -198,7 +248,8 @@ class FrontendBuilder(object):
             skip_db
             update
         """
-        config['main_builder'] = self
+        if not 'main_builder' in config:
+            config['main_builder'] = self
         log = config.get('log')
 
         if not os.path.exists(self.cache_dir_frontend):
@@ -255,32 +306,9 @@ class FrontendBuilder(object):
 
         # 4 observer
         if config.get('watch', False):
-            self.start_observers(launcher=launch_observer, **config)
+            started = self.init_observers(launcher=generate_handler, **config)
+            observer_log = log.with_indent("%s observer started" % started)
         return True
-
-    def start_observers(self, **config):
-        for dependency in self.get_dependencies():
-            dependency.start_observers(**config)
-        self.register_observers(config.get('launcher')(config.get('storages'), self, os.path.realpath(self.src), log=config['log'].async(), main_builder=config.get('main_builder')))
-        if config.get('main_builder', None) is not None:
-            # TODO: do this different? If many man_builder access these observers, if one stops, all observers stop
-            config.get('main_builder').register_observers(self.observers)
-
-    def watch(self, **config):
-        config['watch'] = True
-        log = config['log']
-        if self.build(**config):
-            observer_log = log.with_indent("%s observer started" % len(self.observers))
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                for dependency_observer in self.observers:
-                    dependency_observer.stop()
-            for dependency_observer in self.observers:
-                dependency_observer.join()
-        else:
-            log.write('no observers started, because build failed')
 
     def get_config(self, *args, **kwargs):
         config = self.config
@@ -294,11 +322,6 @@ class FrontendBuilder(object):
         return config
 
     def clean(self, storages, log=None, **config):
-        for storage in storages:
-            if log:
-                config['log'] = log.with_indent('cleaning "%s"' % storage, single_line=not self.debug)
-            storage.clean(**config)
-
         if os.path.exists(self.compile_dir):
             shutil.rmtree(self.compile_dir)
         for path in os.listdir(self.cache_dir_src):

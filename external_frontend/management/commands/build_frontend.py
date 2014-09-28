@@ -5,6 +5,7 @@ from ...builder import FrontendBuilder
 from ...utils.stdout import WrappedOutput
 from functools import partial
 from optparse import make_option
+import time
 
 class Command(BaseCommand):
     args = ''
@@ -23,6 +24,20 @@ class Command(BaseCommand):
 
         started = 0
         selected_frontend = None  # TODO: as opt. argument
+
+        pre_build_log = stdout.with_indent('pre build')
+        storages = {}
+        for name, frontend in settings.FRONTEND_COLLECTION.items():
+            for storage in frontend.USED_STORAGE:
+                storages[storage.NAME] = storage
+
+        for storage in storages.values():
+            storage_stdout = pre_build_log.with_indent('Storage: "%s"' % storage.NAME)
+            storage.pre_build(
+                log=storage_stdout
+            )
+
+        build_log = stdout.with_indent('build')
         for name, frontend in settings.FRONTEND_COLLECTION.items():
             main_builder = frontend.BUILDER
             if not main_builder:
@@ -31,7 +46,7 @@ class Command(BaseCommand):
                 continue
 
             started += 1
-            frontend_stdout = stdout.with_indent('Frontend: "%s"' % frontend.NAME)
+            frontend_stdout = build_log.with_indent('Frontend: "%s"' % frontend.NAME)
 
             frontend_stdout.write('starting builder "%s"' % frontend.BUILDER, 'and watch for changes' if options['watch'] else '')
             if options['watch']:
@@ -43,3 +58,19 @@ class Command(BaseCommand):
 
         if started == 0:
             raise CommandError("didn't find any FRONTENDs with defined BUILDER")
+        else:
+            if options['watch']:
+                watch_log = stdout.with_indent('watching')
+
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    stdout.write('')  # new line after KeyboardInterrupt
+                    for name, frontend in settings.FRONTEND_COLLECTION.items():
+                        main_builder = frontend.BUILDER
+                        main_builder.stop_watching(
+                            log=stdout.with_indent('stop watching "%s"' % name)
+                        )
+
+        stdout.write('build_frontend terminated.')
