@@ -48,6 +48,7 @@ config = {
             'NAME': None,
             'ROOT': None,
             'FILTER': None,
+            'CLEAN_BUILD': None
         },
         'STORAGE_COLLECTION': {}
     },
@@ -70,7 +71,8 @@ config = {
         },
         'STORAGE': {
             'NAME': 'default',
-            'CLASS': 'external_frontend.storage.DevelopmentStorage'
+            'CLASS': 'external_frontend.storage.DevelopmentStorage',
+            'CLEAN_BUILD': True
         },
         'BUILDER': {
             'SRC_NAME': '',

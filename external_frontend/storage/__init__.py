@@ -9,16 +9,15 @@ class Storage(object):
     the Storage is the linker between the View and the actual sources.
     """
 
-    #def __init__(self, settings==None):
-    #    #widget_settings.STORAGE_FACTORY()
-    #    pass
+    def __init__(self, settings):
+        self.clean_build = settings.CLEAN_BUILD
 
     class PathNotFound(Exception):
         pass
 
-    def clean(self):
-        if self.exists():
-            shutil.rmtree(self.root)
+    def pre_build(self, log=None):
+        if self.clean_build:
+            self.clean(log=log)
 
     def clean(self, log=None):
         raise NotImplemented('subclass needs to specify behaviour')
@@ -54,7 +53,7 @@ class FileStorage(Storage):
     root = None
 
     def __init__(self, settings=None, **kwargs):
-        super(FileStorage, self).__init__(**kwargs)
+        super(FileStorage, self).__init__(settings, **kwargs)
         self.root = settings.ROOT
 
         if not os.path.exists(self.root):
