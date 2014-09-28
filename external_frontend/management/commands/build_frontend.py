@@ -70,7 +70,7 @@ class Command(BaseCommand):
                     for name, frontend in settings.FRONTEND_COLLECTION.items():
                         main_builder = frontend.BUILDER
                         main_builder.stop_watching(
-                            log=stdout.with_indent('stop watching "%s"' % name)
+                            log=watch_log.with_indent('stop watching "%s"' % name)
                         )
 
         stdout.write('build_frontend terminated.')
