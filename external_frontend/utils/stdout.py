@@ -1,6 +1,6 @@
 
 class WrappedOutput(object):
-    def __init__(self, stdout, stderr=None, indent='', single_line=False, parent=None, async=False):
+    def __init__(self, stdout, stderr=None, indent='', single_line=False, parent=None, async=False, output_level=None, silent=False):
         if isinstance(stdout, WrappedOutput):
             self.output = stdout
             self.stdout = 'out'
@@ -10,13 +10,15 @@ class WrappedOutput(object):
             self.stdout = stdout
             self.stderr = stderr
         self.indent = indent
-        self.single_line = single_line
+        self.single_line = single_line if output_level != 0 else True
         self.was_single_line = False
         self.counter = 0
         self.parent = parent
         self._async = async
+        self.output_level = output_level
+        self.silent = silent if output_level != 0 else True
 
-    def prepareContent(self, content_list, async):
+    def prepareContent(self, content_list, async, single_line=None):
         content = None
         for part in content_list:
             if content is None:
@@ -24,16 +26,16 @@ class WrappedOutput(object):
             else:
                 content += ' ' + str(part)
 
-        if self.single_line:
-            content = content[:20]
-        if content.startswith('\n'):
-            content = '\033[1m%s\033[0m' % content[1:]
-
-        if self.single_line:
+        if single_line:
+            content = content[:20] if not self.silent else ''
             if content.endswith('\n'):
                 content = content[:-2]
             self.counter += 1
-            return self.get_indent(async) + "had %d logs: %s... # " % (self.counter, content)
+            return self.get_indent(async) + ' > ' + "had %d logs: %s... # " % (self.counter, content)
+
+        if content.startswith('\n'):
+            content = '\033[1m%s\033[0m' % content[1:]
+
         return self.get_indent(async) + content
 
     def log(self, *content):
@@ -51,8 +53,8 @@ class WrappedOutput(object):
 
     def _write(self, stdout, *content, **kwargs):
         async = kwargs.pop('async', self._async)
-        data = self.prepareContent(content, async)
         single_line = self.single_line or kwargs.pop('single_line', False)
+        data = self.prepareContent(content, async=async, single_line=single_line)
 
         if self.output is None:
             if isinstance(stdout, basestring):
@@ -92,7 +94,7 @@ class WrappedOutput(object):
     def with_indent(self, parent=None, single_line=False):
         if parent:
             self.write(parent)
-        return WrappedOutput(self, indent='  ', single_line=single_line, parent=parent, async=self._async)
+        return WrappedOutput(self, indent='  ', single_line=single_line, parent=parent, async=self._async, silent=self.silent, output_level=(self.output_level-1) if self.output_level else self.output_level)
 
     def async(self, parent=None, single_line=False):
-        return WrappedOutput(self, indent='  ', parent=parent, single_line=single_line, async=True)
+        return WrappedOutput(self, indent='  ', parent=parent, single_line=single_line, async=True, silent=self.silent, output_level=(self.output_level-1) if self.output_level else self.output_level)
