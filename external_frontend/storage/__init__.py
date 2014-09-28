@@ -20,8 +20,8 @@ class Storage(object):
         if self.exists():
             shutil.rmtree(self.root)
 
-    def exists(self):
-        return os.path.exists(self.root)
+    def clean(self, log=None):
+        raise NotImplemented('subclass needs to specify behaviour')
 
     def remove(self, path):
         raise NotImplemented('subclass needs to specify behaviour')
@@ -63,6 +63,13 @@ class FileStorage(Storage):
             else:
                 raise Exception('FileStorage view need to be initialized with existing root directory. \
                                 "%s" does not exist' % self.root)
+
+    def exists(self):
+        return os.path.exists(self.root)
+
+    def clean(self, log=None):
+        if self.exists():
+            shutil.rmtree(self.root)
 
     def update(self, path, content, log=None):
         path = os.path.join(self.root, self.solve_path(path, content))
