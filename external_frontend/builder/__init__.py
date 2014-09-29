@@ -442,15 +442,7 @@ class FrontendBuilder(object):
 
     def build_from_db(self, storages, log=None, main_builder=None):
         log = log.with_indent('building')
-        for root, dirnames, filenames in os.walk(self.src):
-            for path in filenames:
-                if path.startswith('.') or path.startswith('styles'):
-                    continue
-                path = os.path.join(os.path.relpath(root, self.src), path)
-                if log:
-                    log.write(path)
-                with open(os.path.join(self.src, path), 'r') as content:
-                    self.update(path, content.read(), storages=storages, log=log)
+        pass #TODO
 
     def update_configuration(self, **config):
         if config['main_builder'] is self:
