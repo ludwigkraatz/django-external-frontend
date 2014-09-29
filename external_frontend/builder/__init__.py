@@ -223,7 +223,7 @@ class FrontendBuilder(object):
             started += dependency.init_observers(**config)
 
         if main_builder in self.observers_watcher:
-            raise Exception('handler for "%s" on "%s" already registered' % (main_builder, self.name))
+            return started
 
         if isinstance(self.src, WrappedSource):
             config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
