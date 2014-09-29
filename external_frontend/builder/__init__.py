@@ -396,6 +396,7 @@ class FrontendBuilder(object):
         pass
 
     def load_config(self):
+        current_cache_dir = self.cache_dir_frontend
         for dependency in self.get_dependencies():
             self.config = dict_merge(self.config, dependency.load_config())
             #main_builder.set_default_config(self.config)
@@ -405,12 +406,12 @@ class FrontendBuilder(object):
             import yaml
             try:
                 # loading a simple yaml config file
-                with open(os.path.join(self.src, self.get_frontend_config_path())) as content:
+                with open(os.path.join(current_cache_dir, self.get_frontend_config_path())) as content:
                     self.config = dict_merge(self.config, yaml.load(content.read()) or {})
             except IOError:
                 try:
                     # processing config folder
-                    with open(os.path.join(self.src, self.get_frontend_config_path(folder=True))) as content:
+                    with open(os.path.join(current_cache_dir, self.get_frontend_config_path(folder=True))) as content:
                         self.config = dict_merge(self.config, yaml.load(content.read()) or {})
                 except IOError:
                     raise
