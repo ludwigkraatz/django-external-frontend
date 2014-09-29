@@ -211,8 +211,9 @@ class FrontendBuilder(object):
             log=config['log'].async(),
             main_builder=config.get('main_builder')
         )
+        watcher = self.register_handler(handler)
 
-        self.observers_watcher[config.get('main_builder', None)] = (handler, self.register_handler(handler))
+        self.observers_watcher[config.get('main_builder', None)] = (handler, watcher)
         started += 1
         config['log'].write('started observer for "%s" on %s' % (self.name, self.src_real))
         return started
