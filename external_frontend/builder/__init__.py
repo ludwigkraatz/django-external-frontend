@@ -145,6 +145,7 @@ class FrontendBuilder(object):
                 if commit:
                     branches = repo.git.execute(['git', 'branch', '--contains', commit])
                     branch = branches.split('\n')[-1].strip()
+                    branch = branches.split(' ')[-1] if ' ' in branch else branch
                 else:
                     branch = 'master'
 
