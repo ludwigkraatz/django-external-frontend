@@ -129,7 +129,7 @@ class FrontendBuilder(object):
         self.css_sources = SortedDict()
 
     def init_src(self, source):
-        if source.startswith('git@'):  # TODO: debug output (cloned to local repo / updated local repo)
+        if source.startswith('git@') or (source.startswith('https://') and '.git' in source):  # TODO: debug output (cloned to local repo / updated local repo)
             from git import *
 
             commit = None
