@@ -373,14 +373,14 @@ class FrontendBuilder(object):
                 for root, dirnames, filenames in os.walk(self.src):
                     relative_path = os.path.relpath(root, self.src)
                     for path in dirnames:
-                        if path.startswith('.'):
+                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
                             continue
                         path = os.path.join(relative_path, path)
                         if not os.path.exists(os.path.join(current_cache_dir, path)):
                             os.mkdir(os.path.join(current_cache_dir, path))
 
                     for path in filenames:
-                        if path.startswith('.'):
+                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
                             continue
                         path = os.path.join(relative_path, path)
                         if os.path.exists(os.path.join(current_cache_dir, path)):
