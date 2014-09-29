@@ -149,9 +149,9 @@ class FrontendBuilder(object):
                     branch = 'master'
 
                 repo.git.checkout(branch)  # TODO: is this the right/best way?
-                repo.remotes.origin.pull(branch)
+                #repo.remotes.origin.pull(branch)
 
-            if commit:
+            if commit:  # TODO: this is not always working? maybe always checkout branch first?
                 repo.git.checkout(commit)
 
             self.src = self.cache_dir_remote
