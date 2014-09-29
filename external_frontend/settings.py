@@ -90,7 +90,7 @@ config = {
             },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/django-external-frontend.git@4acd4f976f93c701a57be6af65c747e99f5a766d',
+                'SRC': 'https://github.com/ludwigkraatz/django-external-frontend.git',
                 'FILTER': '^fancy-frontend/',
                 'DEPENDS_ON': ['basic-frontend'],
                 'TYPE': 'app',
