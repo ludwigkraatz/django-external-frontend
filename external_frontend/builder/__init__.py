@@ -12,6 +12,27 @@ import re
 from django.utils.datastructures import SortedDict
 
 
+class WrappedSource(str):
+    def __new__(self, *args, **kwargs):
+        return super(WrappedSource, self).__new__(self, args[0])
+
+    def __init__(self, source, handler, method_map):
+        super(WrappedSource, self).__init__(source)
+        self.handler = handler
+        self.method_map = method_map
+
+    def export(self, destination, log=None):
+        return self.method_map['export'](self.handler, destination)
+
+
+wrappedGitMethodMap = {
+    'export': lambda repo, destination: repo.index.checkout(
+        force=True,
+        prefix=os.path.realpath(destination) + os.path.sep
+    )
+}
+
+
 def generate_handler(storages, builder, src, log, main_builder):
     class Handler(FileSystemEventHandler):
         def prepare_path(self, path):
@@ -155,7 +176,7 @@ class FrontendBuilder(object):
             if commit:  # TODO: this is not always working? maybe always checkout branch first?
                 repo.git.checkout(commit)
 
-            self.src = self.cache_dir_remote
+            self.src = WrappedSource(self.cache_dir_remote, repo, wrappedGitMethodMap)
         else:
             self.src = source
 
@@ -203,6 +224,10 @@ class FrontendBuilder(object):
 
         if main_builder in self.observers_watcher:
             raise Exception('handler for "%s" on "%s" already registered' % (main_builder, self.name))
+
+        if isinstance(self.src, WrappedSource):
+            config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
+            return started
 
         handler = config.get('launcher')(
             config.get('storages'),
@@ -359,15 +384,17 @@ class FrontendBuilder(object):
         self.update_configuration(storages, log=log, main_builder=main_builder)
 
     def collect(self, **config):
+        log = config.get('log', None)
         for dependency in self.get_dependencies():
             dependency.collect(**config)
         main_builder = config['main_builder']
+        current_cache_dir = self.cache_dir_frontend
+        if not os.path.exists(current_cache_dir):
+            os.mkdir(current_cache_dir)
 
-        if True:  # if is folder
-            current_cache_dir = self.cache_dir_frontend
-            if not os.path.exists(current_cache_dir):
-                os.mkdir(current_cache_dir)
-
+        if isinstance(self.src, WrappedSource):
+            self.src.export(current_cache_dir, log=log)
+        else:
             # only collect, if its not a link for development stage
             if not os.path.islink(current_cache_dir):
                 for root, dirnames, filenames in os.walk(self.src):
