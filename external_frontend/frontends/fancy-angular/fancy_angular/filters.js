@@ -1,12 +1,21 @@
-define(['fancyPlugin!angular', 'fancyPlugin!services', 'fancyPlugin!angularTranslate'], function (angular, services) {
-	'use strict';
+define([
+        'fancyPlugin!angular',
+        'fancyPlugin!services',
+        'fancyPlugin!fancyFrontendConfig',
+        'fancyPlugin!angularTranslate'], function (angular, services, frontendConfig) {
+    'use strict';
 
-	/* Filters */
+    /* Filters */
 
-	angular.module('filters', ['services',  'pascalprecht.translate'])
-		.filter('interpolate', ['version', function(version) {
-			return function(text) {
-				return String(text).replace(/\%VERSION\%/mg, version);
-			};
-		}]);
+    angular.module('filters', ['services',  'pascalprecht.translate'])
+        .filter('interpolate', ['version', function(version) {
+            return function(text) {
+                return String(text).replace(/\%VERSION\%/mg, version);
+            };
+        }])
+        .filter('cssClass', function() {
+            return function(input) {
+              return frontendConfig.widgets.prefix +'-'+ input;
+            };
+        });;
 });
