@@ -408,11 +408,11 @@ class FrontendBuilder(object):
         if not os.path.exists(current_cache_dir):
             os.mkdir(current_cache_dir)
 
-        if isinstance(self.src, WrappedSource):
-            self.src.export(current_cache_dir, log=log)
-        else:
-            # only collect, if its not a link for development stage
-            if not os.path.islink(current_cache_dir):
+        # only collect, if its not a link for development stage
+        if not os.path.islink(current_cache_dir):
+            if isinstance(self.src, WrappedSource):
+                self.src.export(current_cache_dir, log=log)
+            else:
                 for root, dirnames, filenames in os.walk(self.src):
                     relative_path = os.path.relpath(root, self.src)
                     for path in dirnames:
