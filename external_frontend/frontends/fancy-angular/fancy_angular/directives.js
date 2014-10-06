@@ -35,39 +35,77 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     };
     $scope.__log_storage = [];
     $scope.log = {
-        __storage : [],
         error: function(){
             if (true) {
-                $scope.log.__storage.push({type: 'error', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:new Error().stack})
+                var stack, content = Array.prototype.slice.call(arguments);
+                for (var arg in content) {
+                    if (content[arg] instanceof Error) {
+                        content[arg] = {stack: content[arg].stack, type: content[arg].constructor.name};
+                    }
+                }
+                if (!stack) {
+                    stack =  new Error().stack;
+                }
+                $scope.__log_storage.push({type: 'error', timestamp:new Date().getTime(), content:content, stack:stack})
+                $scope.log.failure('Error.') // TODO: get translated default error Message for user
             }else{
                 console.error.apply(console, arguments)
             }
         },
-        success: function(){
+        event: function(){
             if (true) {
-                $scope.log.__storage.push({type: 'success', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:new Error().stack})
-            }else{
-                console.error.apply(console, arguments)
-            }
-        },
-        info: function(){
-            if (true) {
-                //console.log('-->',arguments.callee.caller.name,arguments.callee.caller.arguments.callee.caller.name)
-                $scope.log.__storage.push({type: 'info', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:new Error().stack})
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'event', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
             }else{
                 console.log.apply(console, arguments)
             }
         },
         debug: function(){
             if (true) {
-                $scope.log.__storage.push({type: 'debug', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:new Error().stack})
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'debug', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
             }else{
                 console.log.apply(console, arguments)
             }
         },
         warn: function(){
             if (true) {
-                $scope.log.__storage.push({type: 'warning', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:new Error().stack})
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'warn', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
+                $scope.log.failure('Warning.') // TODO: get translated default warning Message for user
+            }else{
+                console.log.apply(console, arguments)
+            }
+        },
+        success: function(){ // is propagated to user
+            if (true) {
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'success', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
+            }else{
+                console.log.apply(console, arguments)
+            }
+        },
+        failure: function(){ // is propagated to user
+            if (true) {
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'failure', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
+            }else{
+                console.log.apply(console, arguments)
+            }
+        },
+        info: function(){ // is propagated to user
+            if (true) {
+                //console.log('-->',arguments.callee.caller.name,arguments.callee.caller.arguments.callee.caller.name)
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'info', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
+            }else{
+                console.log.apply(console, arguments)
+            }
+        },
+        warning: function(){ // is propagated to user
+            if (true) {
+                var stack = new Error().stack;
+                $scope.__log_storage.push({type: 'warning', timestamp:new Date().getTime(), content:Array.prototype.slice.call(arguments), stack:stack})
             }else{
                 console.log.apply(console, arguments)
             }
