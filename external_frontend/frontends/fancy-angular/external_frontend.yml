@@ -11,4 +11,5 @@ requirejs:
         "introspective-api-client": "js/libs/introspective_api/client"
         "introspective-api-object": "js/libs/introspective_api/object"
         "introspective-api-endpoint": "js/libs/introspective_api/endpoint"
+        "introspective-api-log": "js/libs/introspective_api/log"
 
