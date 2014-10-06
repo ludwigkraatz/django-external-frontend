@@ -404,13 +404,19 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
             }*/
             if (widgetConfig.required.length) {
               require(widgetConfig.required, function(){
-                var response = dependencies.indexOf('template')>=0 ? arguments[dependencies.indexOf('template')] : null,
-                    js = dependencies.indexOf('js')>=0 ? arguments[dependencies.indexOf('js')] : $;
-                    js = js[namespace] ? js[namespace][widgetConfig.widgetType] : null || 
-                            js[frontendConfig.widgets.defaults_namespace] ? js[frontendConfig.widgets.defaults_namespace][widgetConfig.widgetType] : null;
-                    if (js) {//response && 
-                        //$templateCache.put(widgetIdentifier, [response, js])
-                    }else{
+                    var response = dependencies.indexOf('template')>=0 ? arguments[dependencies.indexOf('template')] : null,
+                        js = dependencies.indexOf('js')>=0 ? arguments[dependencies.indexOf('js')] : $;
+                    /*if (!js[namespace] && !namespace) {
+                        namespace = frontendConfig.widgets.defaults_namespace
+                    }
+                    widgetConfig.widgetNamespace = namespace;*/
+                    js = js[namespace] ?
+                        js[namespace][widgetConfig.widgetName]
+                        : null/* || js[frontendConfig.widgets.defaults_namespace] ?
+                            js[frontendConfig.widgets.defaults_namespace][widgetConfig.widgetType]
+                            : null*/;
+                    if (!js) {
+                        // TODO: get some fallback stuff
                         console.error('couldnt find js for widget', widgetConfig.widgetIdentifier)
                     }
                     prepareTemplate(response, js);
