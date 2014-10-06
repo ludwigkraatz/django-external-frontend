@@ -168,15 +168,19 @@ class FrontendBuilder(object):
                 repo = Repo.clone_from(source, self.cache_dir_remote)
             else:
                 repo = Repo(self.cache_dir_remote)
+                repo.git.execute(['git', 'fetch'])
                 if commit:
                     branches = repo.git.execute(['git', 'branch', '--contains', commit])
                     branch = branches.split('\n')[-1].strip()
                     branch = branches.split(' ')[-1] if ' ' in branch else branch
+                    if branch == 'branch)':
+                        branch = None
                 else:
-                    branch = 'master'
+                    branch = None
 
-                repo.git.checkout(branch)  # TODO: is this the right/best way?
-                #repo.remotes.origin.pull(branch)
+                if branch:
+                    repo.git.checkout(branch)  # TODO: is this the right/best way?
+                    repo.remotes.origin.pull(branch)
 
             if commit:  # TODO: this is not always working? maybe always checkout branch first?
                 repo.git.checkout(commit)
