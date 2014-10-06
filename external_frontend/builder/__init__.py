@@ -97,6 +97,7 @@ class FrontendBuilder(object):
     def __init__(self, settings=None):
         self.name = settings.NAME
         self.src_name = settings.SRC_NAME or self.name
+        self._config = settings.CONFIG
         self.debug = settings.DEBUG
         self.type = settings.TYPE
         self.filter = settings.FILTER
@@ -442,6 +443,9 @@ class FrontendBuilder(object):
                         self.config = dict_merge(self.config, yaml.load(content.read()) or {})
                 except IOError:
                     raise
+
+        if self._config:
+            self.config = dict_merge(self.config, self._config)
 
         # set vars for builder from config
         self.current_stage = 'debug'  # TODO: get from config

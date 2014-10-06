@@ -42,7 +42,8 @@ config = {
             'DEPENDS_ON': [],
             'FILTER': None,
             'TYPE': None,  # lib, app, widget, css, img, partial
-            'VERSION': None
+            'VERSION': None,
+            'CONFIG': None
         },
         'BUILDER_COLLECTION': {},
         'STORAGE': {
@@ -82,7 +83,8 @@ config = {
             'CLASS': 'external_frontend.builder.FrontendBuilder',
             'DEPENDS_ON': [],
             'TYPE': 'frontend',
-            'FILTER': ''
+            'FILTER': '',
+            'CONFIG': {}  # TODO: is it safe to use {} here?
         },
         'BUILDER_COLLECTION': {
             'basic-frontend': {
