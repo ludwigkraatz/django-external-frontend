@@ -1,6 +1,8 @@
 from introspective_api.generics import RetrieveAPIView
 from ..api import renderers
 from ..settings import settings
+import os
+from introspective_api.response import ApiResponse
 
 # TODO: watch srces, when static server is active?
 
@@ -35,17 +37,22 @@ class StaticsServer(RetrieveAPIView):
         return kwargs.get('file').split('.')[-1]
 
     def get(self, request, *args, **kwargs):
-        import os
 
         requested_file = kwargs.get('file')
-        # TODO: is this right? istn't response created on the fly?
-        from introspective_api.response import ApiResponse
-        requirejsFallback = self.get_format_suffix(**kwargs).split('.') > 2
+        if not requested_file:
+            return ApiResponse({}, 404).finalize_for(request)
+        requirejsFallback = ''
+        if self.get_format_suffix(**kwargs).split('.') > 2:
+            requirejsFallback = '.'.join(requested_file.split('.')[0:-1])
+        if settings.FILES_FRONTEND_POSTFIX:
+            requested_file += '.'+ self.get_config()['frontend'].NAME
+            if requirejsFallback:
+                requirejsFallback += '.'+ self.get_config()['frontend'].NAME
 
         checked_dirs = []
         for storage in self.storages:
             try:
-                return ApiResponse(storage.get(requested_file, requirejsFallback=requirejsFallback))
+                return ApiResponse(storage.get(requested_file, requirejsFallback=requirejsFallback)).finalize_for(request)
             except storage.PathNotFound:
                 checked_dirs.append(storage.root)
 
@@ -72,4 +79,4 @@ class StaticsServer(RetrieveAPIView):
             'found_path': file_path,
             'dirs': ';\n'.join(','.join(os.listdir(os.path.join(root, file_path))) for root in checked_dirs)
         }
-        return ApiResponse(debug_info, 404)
+        return ApiResponse(debug_info, 404).finalize_for(request)

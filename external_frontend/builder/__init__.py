@@ -749,6 +749,8 @@ class FrontendBuilder(object):
             else:
                 log = log.with_indent('copying ' + new_path)
 
+            if externalFrontendSettings.FILES_FRONTEND_POSTFIX:
+                new_path += '.' + config['main_builder'].name
             for storage in storages:
                 if content is None:
                     return storage.remove(new_path, log=log.with_indent(new_path))

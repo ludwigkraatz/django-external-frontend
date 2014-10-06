@@ -2,6 +2,7 @@
 #from django.utils.builder import
 import os
 import shutil
+from ..settings import settings as externalFrontendSettings
 
 
 class Storage(object):
@@ -93,10 +94,10 @@ class FileStorage(Storage):
         #    os.remove(os.path.join(self.root, path))
         # TODO: recursively remove directories if empty
 
-    def get(self, path, requirejsFallback=False):
+    def get(self, path, requirejsFallback=None):
         if requirejsFallback:
-            if os.path.exists(os.path.join(self.root, '.'.join(path.split('.')[0:-1]))):
-                path = '.'.join(path.split('.')[0:-1])
+            if os.path.exists(os.path.join(self.root, requirejsFallback)):
+                path = requirejsFallback
         try:
             with open(os.path.join(self.root, path), 'r') as content:
                 return content.read()
@@ -108,11 +109,34 @@ class StaticsStorage(FileStorage):
 
     def clean(self, **config):
         super(StaticsStorage, self).clean()
+    def build(self, frontend, **config):
         # TODO: if statics
-        from django.core.management import call_command
-        call_command('collectstatic', link=True, interactive=False, stdout=config.get('log', None))
+        from django.contrib.staticfiles.finders import get_finders
+        from django.utils.datastructures import SortedDict
+        log = config.get('log')
+        found_files = SortedDict()
+        for finder in get_finders():
+            for path, storage in finder.list([]): # ['CVS', '.*', '*~'] = ignore patterns
+                # Prefix the relative path if the source storage contains it
+                if getattr(storage, 'prefix', None):
+                    prefixed_path = os.path.join(storage.prefix, path)
+                else:
+                    prefixed_path = path
 
-    def get(self, path, requirejsFallback=False):
+                if prefixed_path not in found_files:
+                    found_files[prefixed_path] = (storage, path)
+                    source = storage.path(path)
+                    new_path = path
+                    if externalFrontendSettings.FILES_FRONTEND_POSTFIX:
+                        new_path += '.' + frontend.NAME
+                    log.write('collecting ', path)
+                    with open(source, 'r') as data:
+                        self.update(new_path, data.read(), log=log)
+
+        #from django.core.management import call_command
+        #call_command('collectstatic', link=True, interactive=False, stdout=config.get('log', None))
+
+    def get(self, path, requirejsFallback=None):
         class request(object):  # mockup
             META = {'HTTP_IF_MODIFIED_SINCE': None}
 
@@ -123,8 +147,8 @@ class StaticsStorage(FileStorage):
             from django.utils.six.moves.urllib.request import url2pathname
             from django.http import Http404
             if requirejsFallback:
-                if os.path.exists(os.path.join(self.root, '.'.join(path.split('.')[0:-1]))):
-                    path = '.'.join(path.split('.')[0:-1])
+                if os.path.exists(os.path.join(self.root, requirejsFallback)):
+                    path = requirejsFallback
             try:
                 return serve(request, path, insecure=True)
             except Http404:
