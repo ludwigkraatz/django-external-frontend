@@ -11,11 +11,13 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 var widgetSelector = this.config.selector;
                 if ($(widgetSelector).size() == 0){
                     console.warn('no element with '+widgetSelector+' found.');
-                    return;
+                    return false;
                 }else if ($(widgetSelector).size()>1) {
                     console.error('this app currently supports only one active widget with  ' +
                             widgetSelector)
+                    return false;
                 }
+            return true;
         },
         prepare_app: function(){
             var $this = this;
