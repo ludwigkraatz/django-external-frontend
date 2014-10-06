@@ -18,8 +18,22 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     var $ObjectProvider = $injector.get('$ObjectProvider'),
         $fancyAngularLocalesLoader = $injector.get('$fancyAngularLocalesLoader'),
         $translate = $injector.get('$translate'),
+        $compile = $injector.get('$compile'),
         $q = $injector.get('$q');
     
+    $scope.apply = function(rawContent, callback) {
+        var content = angular.element(rawContent);
+        var compiled = $compile(content);
+
+        // first call callback, so elements are attached to DOM
+       if (callback){callback(content);}
+        
+        // then execute compiled
+        compiled($scope);
+        $scope.$apply();
+        $scope.$emit('applied');
+    };
+    $scope.__log_storage = [];
     $scope.log = {
         __storage : [],
         error: function(){
@@ -279,17 +293,6 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
           }
         };
 
-        var apply = function(rawContent, callback) {
-            var content = angular.element(rawContent);
-            var compiled = $compile(content);
-
-            // first call callback, so elements are attached to DOM
-           if (callback){callback(content);}
-            
-            // then execute compiled
-            compiled(currentScope);
-            currentScope.$apply();
-        };
         function widgetLoadErrorHandler() {
            return "<div>ERROR! {{ ERROR.WIDGET.LOAD | translate }}<a>{{ ERROR.RETRY | translate }}</a></div>"
         }
@@ -325,7 +328,6 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                                                    currentElement,
                                                    widgetConfig.widgetTemplate!="false" ? content : null,
                                                    widgetConfig.widgetType,
-                                                   apply,
                                                    js,
                                                    currentScope
                               );
@@ -359,7 +361,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                 var provider = null;
                 //currentScope.__target = target;
                 if (response) {
-                    apply(response, function(content){
+                    currentScope.apply(response, function(content){
                         proceed(content, currentScope);
                     })
                 }else{
