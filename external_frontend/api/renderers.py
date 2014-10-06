@@ -95,7 +95,7 @@ class SvgRenderer(BaseRenderer):
     """
     Plain image parser.
     """
-    media_type = 'image/svg'
+    media_type = 'image/svg+xml'
     format = 'svg'
 
     def render(self, data, *args, **kwargs):
