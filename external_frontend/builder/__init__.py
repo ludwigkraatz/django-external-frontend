@@ -499,7 +499,7 @@ class FrontendBuilder(object):
 
     def build_frontend_config(self, content=None):
         config = {}
-        for key in ['start', 'requirejs']:
+        for key in ['start', 'frontends', 'requirejs']:
             config[key] = self.get_config(key) or {}
         for key in ['debug_level']:
             config[key] = self.get_config(key)
@@ -544,11 +544,11 @@ class FrontendBuilder(object):
                 'htmlUrl': None,
 
                 "debug_level": 0,
-                "defaults_namespace": "fancy_angular",
+                "defaults_namespace": defaults_namespace,
                 "namespace": self.name,
                 "prefix": prefix,
                 "widgets": {
-                    "defaults_namespace": "fancy_angular",
+                    "defaults_namespace": defaults_namespace,
                     "namespace": self.name,
                     "prefix": prefix
                 },
