@@ -131,6 +131,9 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                         //$(element).attr('ng-view', '');
                         //$(element).attr('ng-bind-html', 'activeContent');
                         //$(element).attr('ng-include', '"http://localhost:8000/js/widgets/survey/partials/survey/v1/survey.html"')
+                        $(element).attr('ng-keydown', '_ctrlModeActive = $event.altKey');
+                        $(element).attr('ng-keyup', '_ctrlModeActive = $event.altKey');
+                        $(element).attr('ng-class', '_ctrlModeActive ? "'+coreApp.config.appName+'-interaction-reveal" : ""');
                         angular.bootstrap(element, [app['name']]);
                         angular.module('config').constant('frontendCore', coreApp);
                 });
