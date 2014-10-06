@@ -18,6 +18,7 @@ config = {
         'STATICS_OVER_API': None,  # if None, returns the global DEBUG value
         'CACHE_ROOT': None,
 
+        'API_FRONTEND_PREFIX': None,
         'FRONTEND': {
             'NAME': None,
             'PREFIX': None,  # used as root folder in storage as well as in statics server name
@@ -58,11 +59,13 @@ config = {
         'STATICS_OVER_API': django_settings.DEBUG,
         # unwrapped getter: app_settings.init.get_instance
         '_INIT_METHOD': 'app_settings.init.get_wrapped_instance',
+        'API_FRONTEND_PREFIX': 'frontend.',
 
         'FRONTEND': {
             'NAME': 'default',
             'STORAGE': 'default',
             'WORDING_HANDLER': 'default',
+            'ENDPOINT': '',
             'BUILDER': 'default',
         },
         'WORDINGS': {

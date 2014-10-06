@@ -1,14 +1,17 @@
 from ..settings import settings
 from ..server import StaticsServer
 from introspective_api.endpoints import api_root, ImproperlyConfigured
+from introspective_api.views import EndpointView
 
 default_frontend_endpoint = None
+frontends = {}
 
-
-def get_default_endpoint():
+def get_default_endpoint(name):
+    global default_frontend_endpoint, frontends
     if default_frontend_endpoint is None:
-        default_frontend_endpoint = api_root.register_endpoint('frontend', namespace='frontend', active=True)
-    return default_frontend_endpoint
+        default_frontend_endpoint = api_root.register_endpoint('frontend', active=True)
+
+    return default_frontend_endpoint.register_endpoint(name, namespace=settings.API_FRONTEND_PREFIX+name)
 
 if settings.STATICS_OVER_API:
     for name, frontend in settings.FRONTEND_COLLECTION.items():
@@ -17,17 +20,15 @@ if settings.STATICS_OVER_API:
         })
 
         # TODO
-        frontend_endpoint = frontend_settings.FRONTEND.ENDPOINT or get_default_endpoint()
-        try:
-            static = frontend_endpoint.register_endpoint("static")
-        except ImproperlyConfigured:
-            raise Exception("when multiple Frontends are defined, the ENDPOINT setting is mandatory")
+        frontend_endpoint = frontend_settings.FRONTEND.ENDPOINT or get_default_endpoint(name)
+        frontends[name] = frontend_endpoint
+        static = frontend_endpoint.register_endpoint("static", view_name='static-root', view=EndpointView)
 
         static.register_selector(
             "file",
             ".*",
             view=StaticsServer,
-            view_name=name.lower() + '-statics',  # TODO: FRONTEND.PREFIX
+            view_name='statics',
             view_config={
                 'frontend': frontend_settings.FRONTEND
             },
