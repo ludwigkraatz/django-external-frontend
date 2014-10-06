@@ -815,7 +815,10 @@ class FrontendBuilder(object):
                 scss_files=self.css_config
             )
 
-            config_files = dict(content_list)  # config files are compiled in alphabetical order
+            # config files need to be compiled in alphabetical order
+            config_files = dict(content_list)
+            # TODO: compile first consts, then design:
+            # current_list = (entry if entry.startswith('consts') for entry in content_list)
             if content is False:
                 _scss._scss_files = config_files
                 content = _scss.compile()
