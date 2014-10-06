@@ -717,7 +717,9 @@ class FrontendBuilder(object):
             compile_as = 'css-config'
             config['rel_path'] = config['path'].replace(self.name + '/css/', self.name + '/')
             config['new_path'] = 'core.css'
-        elif path.endswith('.sass') or path.endswith('.scss'):
+        elif path.endswith('.sass') or path.endswith('.scss') or (
+                new_path and (new_path.endswith('.sass') or new_path.endswith('.scss'))
+            ):
             compile_as = 'scss'
             config['new_path'] = new_path.replace('.scss', '.css').replace('.sass', '.css')
             config['rel_path'] = config['path'].replace(self.name + '/widgets/', self.name + '/').replace('/css/', '/')
