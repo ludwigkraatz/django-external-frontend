@@ -107,10 +107,11 @@ class FrontendBuilder(object):
 
         self.cache_dir_src = self.cache_dir + os.path.sep + 'src'
         self.cache_dir_frontend = self.cache_dir_src + os.path.sep + self.name
-        self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + self.name
-        self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + self.name
-        self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + self.name
-        self.compile_dir = self.cache_dir + os.path.sep + 'compiled' + os.path.sep + self.name
+        self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + os.path.sep + self.name
+        self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + os.path.sep + self.name
+        self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + os.path.sep + self.name
+        self.compile_root = self.cache_dir + os.path.sep + 'compiled'
+        self.compile_dir = self.compile_root + os.path.sep + self.name
 
         self.init_src(settings.SRC)
         self.src_real = os.path.realpath(self.src)
@@ -201,12 +202,12 @@ class FrontendBuilder(object):
         for dependency in self.get_dependencies():
             dependency.init_dependencies(main_builder=main_builder)
 
-    def register_handler(self, event_handler):
+    def register_handler(self, event_handler, path):
         if self.observer is None:
             self.observer = Observer()
             self.observer.start()
 
-        return self.observer.schedule(event_handler, self.src_real, recursive=True)
+        return self.observer.schedule(event_handler, path, recursive=True)
 
     def reset_observer(self):
         if hasattr(self, 'observer') and self.observer:
@@ -226,6 +227,7 @@ class FrontendBuilder(object):
         if main_builder in self.observers_watcher:
             return started
 
+        path = self.src_real
         if isinstance(self.src, WrappedSource):
             config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
             return started
@@ -233,15 +235,15 @@ class FrontendBuilder(object):
         handler = config.get('launcher')(
             config.get('storages'),
             self,
-            self.src_real,
+            path,
             log=config['log'].async(),
             main_builder=config.get('main_builder')
         )
-        watcher = self.register_handler(handler)
+        watcher = self.register_handler(handler, path)
 
         self.observers_watcher[config.get('main_builder', None)] = (handler, watcher)
         started += 1
-        config['log'].write('started observer for "%s" on %s' % (self.name, self.src_real))
+        config['log'].write('started observer for "%s" on %s' % (self.name, path))
         return started
 
     def stop_watching(self, log, main_builder=None):
@@ -350,8 +352,8 @@ class FrontendBuilder(object):
         return config
 
     def clean(self, storages, log=None, **config):
-        if os.path.exists(self.compile_dir):
-            shutil.rmtree(self.compile_dir)
+        if os.path.exists(self.compile_root):
+            shutil.rmtree(self.compile_root)
         for path in os.listdir(self.cache_dir_src):
             path = os.path.join(self.cache_dir_src, path)
             if not os.path.islink(path) and os.path.isdir(path):
