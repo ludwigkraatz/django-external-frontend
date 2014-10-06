@@ -232,8 +232,11 @@ class FrontendBuilder(object):
 
         path = self.src_real
         if isinstance(self.src, WrappedSource):
-            config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
-            return started
+            if os.path.islink(self.cache_dir_frontend):
+                path = os.path.realpath(self.cache_dir_frontend)
+            else:
+                config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
+                return started
 
         handler = config.get('launcher')(
             config.get('storages'),
