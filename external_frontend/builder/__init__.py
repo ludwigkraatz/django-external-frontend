@@ -10,6 +10,7 @@ from ..utils.dict import dict_merge
 from ..settings import settings as externalFrontendSettings
 import re
 from django.utils.datastructures import SortedDict
+from django.core.urlresolvers import reverse
 
 
 class WrappedSource(str):
@@ -284,6 +285,13 @@ class FrontendBuilder(object):
 
         if not os.path.exists(self.cache_dir_frontend):
             os.makedirs(self.cache_dir_frontend)
+            
+
+        self.host_root_url = reverse('api:api-root')
+        self.static_content_root_url = '' #  reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
+        self.static_root_url = reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-root')
+        self.static_img_root_url = self.static_root_url + 'img/'
+        self.static_js_root_url = self.static_root_url + 'js/'
 
         self.clean(**config)
         #0 init dependencies
@@ -491,9 +499,8 @@ class FrontendBuilder(object):
         for key in ['debug_level']:
             config[key] = self.get_config(key)
 
-        config['start']['apps'] = {}
-        host = 'http://localhost:8000/api/'
-        
+        config['start']['frontends'] = []
+
         for app, app_config in self.get_config('apps', default={}).items():
             defaults_namespace = 'fancy-frontend' # TODO from cinfig
             if not isinstance(app_config, dict):
@@ -510,11 +517,13 @@ class FrontendBuilder(object):
                     'defaults_namespace': defaults_namespace
                 }
 
-            host = app_config.get('base_url', '/api/')
-            config['start']['apps'][app] = {
+            host = app_config.get('base_url', self.host_root_url)
+            if app == self.name:
+                config['start']['frontends'].append(app)
+            config['frontends'][app] = {
                 'init': {
                     'host': host,
-                    'content_host': host + 'frontend/content/',
+                    'content_host': self.static_content_root_url,
                     'crossDomain': False
                 },
                 'selector': '[load-' + app+']',
@@ -548,8 +557,8 @@ class FrontendBuilder(object):
                     }
                 }
             }
-        static_host = host + 'frontend/static/'
-        config['requirejs']['baseUrl'] = static_host
+
+        config['requirejs']['baseUrl'] = self.static_root_url
         return config
 
     def generate_build_path(self, orig_path):
@@ -803,7 +812,7 @@ class FrontendBuilder(object):
             prefix = self.name
 
             self.css_vars['$frontend-prefix'] = scss.types.String.unquoted((prefix + '-') if prefix else '')
-            self.css_vars['$image-root'] = scss.types.String.unquoted('http://localhost:8001/api/frontend/static/img/')
+            self.css_vars['$image-root'] = scss.types.String.unquoted(self.static_img_root_url)
 
             for content_path in content_list:
                 if not content_path.endswith('consts.scss'):
