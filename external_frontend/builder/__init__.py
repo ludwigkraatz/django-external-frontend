@@ -811,7 +811,7 @@ class FrontendBuilder(object):
 
                 parts = content_path.split(os.path.sep)
                 if not parts[1].startswith('consts'):  # and parts[0] == self.name:
-                    with open(os.path.join(self.compile_dir, 'css', parts[1]), 'w+') as file:
+                    with open(os.path.join(self.compile_dir, 'css', parts[1]), 'a+') as file:
                         file.write(content_list[content_path])
 
             config['log'].write('loaded', str(len(self.css_vars.keys())), 'vars from', str(len(content_list)), 'files')
