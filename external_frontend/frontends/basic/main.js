@@ -69,9 +69,10 @@ require(['text!config'], function(config){
     function proceed(frontendConfig){
         require.config(frontendConfig.requirejs);
 
-        for (key in frontendConfig.start.apps) {
-            var instanceConfig = frontendConfig.start.apps[key];
-            require( ['fancyPlugin!app:'+key], function(app) {
+        for (key in frontendConfig.start.frontends) {
+            var app_name = frontendConfig.start.frontends[key],
+                instanceConfig = frontendConfig.frontends[app_name];
+            require( ['fancyPlugin!app:'+app_name], function(app) {
                 new app(instanceConfig);
             });
         }
