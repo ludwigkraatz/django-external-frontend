@@ -35,19 +35,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 $widget.attr('load-'+appName, undefined);
             })
         },
-        set_options: function ($widget, options){
-            $widget.data(this.config.appName + '-widget-options', $.extend({}, options));
-        },
-        create_widget: function($widget, widgetName, options){
-            $widget.attr('load-widget', widgetName);
-            // TODO: maybe wrap this.$($widget) to enable having a private scope in the loader application
-            if (options)this.set_options($widget, options);
-        },
-        create_plugin: function($widget, widgetName, options){
-            $widget.attr('load-plugin', widgetName);
-            if (options)this.set_options($widget, options);
-        },
-        init_app: function(){
+        _init_app: function(){
             var coreApp = this;
             config = {
                 "defaults": {
