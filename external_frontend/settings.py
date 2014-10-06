@@ -44,6 +44,8 @@ config = {
             'TYPE': None,  # lib, app, widget, css, img, partial
             'VERSION': None,
             'CONFIG': None
+        #   'FINGERPRINT': '02:13:..'
+        #   'CERT': ''
         },
         'BUILDER_COLLECTION': {},
         'STORAGE': {
