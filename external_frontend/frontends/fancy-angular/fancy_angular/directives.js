@@ -148,31 +148,136 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
         $scope.__state = $.extend({}, $parentScope.__state[$scope.generateWidgetName()], $scope.__state);
     }
     $scope.__defaultWidgetView = widgetConfig.widgetView;
-    $scope.__widgetData = widgetConfig.widgetResource ? (widgetConfig.widgetResource): null;
-    $scope.__widgetReference = widgetConfig.widgetReference;
-    $scope.__widgetResource = widgetConfig.widgetResource;
-    $scope.__widgetResourceList = null;
-    $scope.__target = $scope.__widgetReference ? 'relationship' : 'uuid';
-    $scope.__widgetIdentifier = widgetConfig.widgetIdentifier
-    $scope.generateIdentifier = function(){
-        return $scope.__widgetIdentifier + (
-                    $scope.__defaultWidgetView ? '#' + $scope.__defaultWidgetView : ''
-                );
-        $scope.__widgetType + (
-                    $scope.__widgetData ? ':' + $scope.__widgetData : ''
+    //$scope.__widgetData = widgetConfig.widgetResource ? (widgetConfig.widgetResource): null;
+    
+    $scope.__resourceReference = widgetConfig.widgetReference;
+    $scope.__resourceId = null; //widgetConfig.widgetResource;
+    $scope.__resourceIdList = null;
+
+    $scope.__target = $scope.__resourceReference ? 'relationship' : 'uuid';
+    $scope.__widgetIdentifier = widgetConfig.widgetIdentifier;
+    $scope.generateWidgetState = function(){
+        return (
+                    $scope.__resourceId ? ':' + $scope.__resourceId : ''
                 ) + (
                     $scope.__defaultWidgetView ? '#' + $scope.__defaultWidgetView : ''
                 )
+    }
+    $scope.generateIdentifier = function(){
+        /*return $scope.__widgetName + (
+                    $scope.__defaultWidgetView ? '#' + $scope.__defaultWidgetView : ''
+                );
+        */
+        return $scope.generateWidgetName() + $scope.generateWidgetState();
     };
-    if (!widgetConfig.plugin) {
+    $scope.__type = widgetConfig.plugin ? 'plugin' : 'widget';
+
+    if ($scope.__type == 'widget') {
         $scope.resource = {};
         $scope.resourceList = [];
         $scope.log.debug('init _resource scope', $scope)
-        $scope._resource = undefined;
-        $scope._resourceList = undefined;
+        $scope._relationships = {};
+        $scope._resource = $ObjectProvider.blank({
+            initialContent: $scope.resource,
+            log: $scope.log
+        });
+        $scope._resourceList = $ObjectProvider.blank({
+            initialContent: $scope.resourceList,
+            log: $scope.log
+        });
+    
+        $scope.updateResource = function (resource) {
+            if (resource && resource.__path && resource.__path.target) {
+                if (resource.__path.target == 'relationship') {
+                    if ($scope['_resourceList'] !== resource) {
+                        $scope.log.debug(' updating resourceList', $scope['_resourceList'], 'with', resource)
+                        var old = $scope['_resourceList'];                             
+                        $scope['_resourceList'] = resource;
+                        old.replaceWith(resource);
+                    }
+                }else{
+                    if ($scope['_resource'] !== resource) {
+                        $scope.log.debug(' updating resource', $scope['_resource'], 'with', resource)
+                        var old = $scope['_resource'];
+                        $scope['_resource'] = resource;
+                        old.replaceWith(resource);
+                    }
+                }
+                return resource
+            }
+            $scope.log.debug(' updating failed', resource, 'has no __path.target')
+            return undefined
+        }
+
+        $scope.initResource = function (settings) {
+            $scope.log.debug('init scope resource');
+    
+            // TODO - don't just take the first, get the primary (_resourceList.primary()?)
+            if ($scope.__defaultWidgetView == 'detail' && $scope.resourceList && $scope.resourceList.length) {
+                $scope.log.debug('display list as the primary element')
+                $scope.__target = 'uuid';
+                $scope.__resourceId = $scope.resourceList[0].uuid ? $scope.resourceList[0].uuid : $scope.resourceList[0];
+            }
+    
+            var data,
+                target = $scope.__target;
+            if (target == 'relationship'){
+                data = $scope.__resourceReference
+            }else{
+                target = target  || 'uuid';
+                data = $scope.__resourceId;
+            }
+            return $scope.updateResource($scope.object({target:target, data:data}));
+        }
+    
+        $scope.prepareResource = function() {
+            $scope.log.debug('prepare scope resource');
+            
+            if ($scope.__resourceReference) {
+                //$scope.__resourceId = $scope.__resourceReference;
+                var widgetReferenceParts = $scope.__resourceReference.split('.');
+                if (widgetReferenceParts.length == 2) {
+                    // TODO
+                    throw Error('todo')
+                    x = $parentScope[widgetReferenceParts[0]][widgetReferenceParts[1]]
+                }else{
+                    if (!$parentScope['resource']) {
+                        $parentScope['resource'] = {}
+                    }
+                    //if ($parentScope['resource'][widgetReferenceParts[0]]) {console.log('register watcher for parent.resource.REFERENCE',  widgetReferenceParts[0]);
+                        $parentScope.$watch('resource.' + widgetReferenceParts[0], function() {
+                            $scope.log.debug('parents resource.'+widgetReferenceParts[0]+' has changed', $parentScope['resource'], $parentScope['resource'][widgetReferenceParts[0]]);
+                            $scope.__resourceIdList = $parentScope['resource'][widgetReferenceParts[0]];
+                            $scope.initResource({force_update: false});
+                        });
+                        $parentScope.$watch('_relationships.' + widgetReferenceParts[0], function() {
+                            $scope.log.debug('parents _relationships.'+widgetReferenceParts[0]+' has changed', $parentScope['_relationships'], $parentScope['_relationships'][widgetReferenceParts[0]]);
+                            $scope.updateResource($parentScope['_relationships'][widgetReferenceParts[0]]);
+                        });
+                    //} // TODO? this is still weird. And right now its overwritten in provider.load
+                    //$scope['resource'] = $parentScope['resource'][widgetReferenceParts[0]] = {};
+                    
+                    
+                } // TODO: throw error if more than 2
+                if ($parentScope['_resource']) {
+                    //$scope['_parent_resource'] = $parentScope['_resource'];
+                }
+            }
+            if ($scope.__resourceId) {
+                //$scope.updateResource();
+            }
+        }
+        
+    }else{
+        $scope.log.debug('init plugin scope', $scope);
+        
+        $scope.updateResource = $scope.initResource = $scope.prepareResource = function() {
+            $scope.log.error('not available for plugins');
+        }
     }
 
-    for (var key in jsConfig) {$scope.log.debug('jsConfig: ', key, jsConfig[key])
+    for (var key in jsConfig) {
+        $scope.log.debug('jsConfig: ', key, jsConfig[key])
         $scope[key] = jsConfig[key];
     }
     $scope.__fixtures = {};
@@ -189,13 +294,48 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
         $scope.__fixtures[name] = undefined;
     };
     
+    $scope.initResourceBindings = function(resource){
+        if (!!!resource.__event_handler) {
+            $scope.log.debug('skip init resource bindings for', resource, 'because seems to be attribute')
+            return
+        }
+        $scope.log.debug('init resource bindings for', resource)
+        resource.bind('post-*', function(event, apiResult){
+            $scope.log.event.apply(null, arguments)
+            if (apiResult.action != 'fixture') {
+                $scope.apply();
+            }
+        })
+        resource.bind('start-loading*', function(event, apiResult){
+            $scope.log.event('start loading', event, apiResult)
+            $scope['!private'].$widget.start_loading();
+        })
+        resource.bind('finished-loading*', function(event, apiResult){
+            $scope.log.event('end loading', event, apiResult)
+            $scope['!private'].$widget.finished_loading();
+        })
+        resource.bind('replaced', function(event, new_resource){
+            $scope.log.event('replaced', resource, 'with', new_resource)
+            $scope.initResourceBindings(new_resource);
+        })
+        resource.bind('accessed-related', function(event, new_resource){
+            $scope.log.event('accessed', new_resource, 'from', resource)
+            $scope.initResourceBindings(new_resource);
+        })
+    };
+    $scope.$on('applied', function(event){
+            $scope.log.event('$digest');// , event);
+            event.stopPropagation();
+    })
+    
     $scope.object = function(settings){
         var provider, fixture;
         $scope.log.debug('getting object', settings, 'fixtures:', $scope.__fixtures);
+        settings.log = $scope.log;
         
-        if (settings.target == 'relationship' && $scope.__widgetResourceList) {
+        if (settings.target == 'relationship' && $scope.__resourceIdList) {
             $scope.log.debug('found relationship in parent');
-            fixture = $scope.__widgetResourceList;
+            fixture = $scope.__resourceIdList;
         }
         if (!fixture) {
             for (var name in $scope.__fixtures){
@@ -249,71 +389,30 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                 return undefined
             }
             settings['initialContent'] = $scope['resource'];
-            provider = $ObjectProvider.get(settings) //@currentScope.__widgetType
+            provider = $ObjectProvider.get(settings) //@currentScope.__widgetName
         }
+        $scope.initResourceBindings(provider);
         return fixture ? provider.fromFixture(fixture) : provider
     };
-    
-    $scope.updateResource = function (resource) {
-        if (resource && resource.__path && resource.__path.target) {
-            if (resource.__path.target == 'relationship') {
-                if ($scope['_resourceList'] !== resource) {
-                    $scope.log.debug(' updating resourceList', resource, $scope['_resourceList'])
-                    $scope['_resourceList'] = resource;
-                }
-            }else{
-                if ($scope['_resource'] !== resource) {
-                    $scope.log.debug(' updating resource', resource, $scope['_resource'])
-                    $scope['_resource'] = resource;
-                }
+    $scope.init = function($widget){
+        $scope['!private'] = {}
+        $scope['!private'].$widget = $widget;
+        if ($widget.object) {
+            $scope.__as = $widget.object; // TODO: use for ApiResources
+        }
+        if ($scope.__state && $scope.__state['.']) {
+            // TODO: update scope from state['.']
+            if ($scope.__state['.']['activeView']) {
+                $scope.__defaultWidgetView = $scope.__state['.']['activeView'];
+                // TODO : view state
             }
-            return resource
-        }
-        $scope.log.debug(' updating failed', resource, 'has no __path.target')
-        return undefined
-    }
-    
-    $scope.initResource = function (settings) {
-        var data,
-            target = $scope.__target;
-        if (target == 'relationship'){
-            data = $scope.__widgetReference
-        }else{
-            target = target  || 'uuid';
-            data = $scope.__widgetResource;
-        }
-        return $scope.updateResource($scope.object({target:target, data:data}));
-    }
-
-    $scope.init = function() {
-        if ($scope.__widgetReference) {
-            //$scope.__widgetResource = $scope.__widgetReference;
-            var widgetReferenceParts = $scope.__widgetReference.split('.');
-            if (widgetReferenceParts.length == 2) {
-                // TODO
-                throw Error('todo')
-                x = $parentScope[widgetReferenceParts[0]][widgetReferenceParts[1]]
-            }else{
-                if (!$parentScope['resource']) {
-                    $parentScope['resource'] = {}
-                }
-                //if ($parentScope['resource'][widgetReferenceParts[0]]) {console.log('register watcher for parent.resource.REFERENCE',  widgetReferenceParts[0]);
-                    $parentScope.$watch('resource.' + widgetReferenceParts[0], function() {
-                        $scope.log.debug('parents resource.REFERENCE has changed',  widgetReferenceParts[0], $parentScope['resource'], $parentScope['resource'][widgetReferenceParts[0]]);
-                        $scope.__widgetResourceList = $parentScope['resource'][widgetReferenceParts[0]];
-                        $scope.updateResource();
-                    });
-                //} // TODO? this is still weird. And right now its overwritten in provider.load
-                //$scope['resource'] = $parentScope['resource'][widgetReferenceParts[0]] = {};
-                
-                
-            } // TODO: throw error if more than 2
-            if ($parentScope['_resource']) {
-                //$scope['_parent_resource'] = $parentScope['_resource'];
+            if ($scope.__state['.']['uuid']) {
+                $scope.__resourceId = $scope.__state['.']['uuid'];
             }
-        }
-        if ($scope.__widgetResource) {
-            //$scope.updateResource();
+            if ($scope.__state['.']['uuid_list']) {
+                $scope.__resourceIdList = $scope.__state['.']['uuid_list'];
+            }
+            
         }
     }
 } // ', ['$scope', '$translate', '$translatePartialLoader', function
