@@ -139,7 +139,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         initEndpoints: function(){
 
             settings = this.config;
-            console.log('(init)', '[frontendCore]:', this);
+            this.log('(init)', '[frontendCore]:', this);
             this.authEndpointHost = settings.init.host;
 
             this.endpoint = this.new_ajax({
@@ -255,7 +255,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 var fixture = 'fancyPlugin!fixture:' + (settings.fixtures[key]+':'+settings.fixtures[key]);
                 settings.scope.__required.push(fixture);
                 require([fixture, 'fancyPlugin!angular', 'fancyPlugin!currentApp', 'fancyPlugin!services'], function(fixture, angular, app){
-                    settings.scope.log.debug('loaded fixture', settings.fixtures[key], fixture)
+                    settings.scope.log.event('loaded fixture', settings.fixtures[key], fixture)
                     settings.scope.addFixture(settings.fixtures[key], fixture)
                     settings.scope.$apply();
                     if (settings.callback){
