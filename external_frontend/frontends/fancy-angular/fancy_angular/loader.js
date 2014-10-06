@@ -31,7 +31,8 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                 var widgetName = $widget.attr('load-'+appName);
                 //$widget.html('<div class="'+appName+'-loading"></div>');
 
-                $this.create_widget($widget, namespace+'.'+widgetName)
+                //$this.create_widget($widget, namespace+'.'+widgetName)
+                $widget.attr('load-widget', namespace+'.'+widgetName);
                 $widget.attr('load-'+appName, undefined);
             })
         },
@@ -144,7 +145,8 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
 
             this.endpoint = this.new_ajax({
                 endpoint:   settings.init.host,
-                crossDomain: settings.init.crossDomain
+                crossDomain: settings.init.crossDomain,
+                log: this.__log
             });/*
             this.data = this.new_ajax({
                 endpoint:   settings.init.host,
@@ -195,7 +197,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         },
 
 
-        _load_widget: function ($widget, response, widget_name, apply_method, js, scope) {
+        _load_widget: function ($widget, response, widget_name, js, scope) {
             if (widget_name === undefined) {
                 widget_name = $widget.attr('load-widget');
             }
@@ -205,8 +207,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
             
             $widget.attr('data-' + this.config.prefix + '-widget-name', widget_name); // .slice(widget_name.search('>')+1)
 
-            var options = $($widget[0]).data(this.config.appName + '-widget-options') || {};
-            options['apply_method'] = apply_method;
+            var options = this.get_options($widget[0]);
             options['widgetCore'] = this;
             options['scope'] = scope;
             options['content'] = options['content'] || response;
