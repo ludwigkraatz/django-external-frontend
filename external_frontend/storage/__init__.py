@@ -20,6 +20,9 @@ class Storage(object):
         if self.clean_build:
             self.clean(log=log)
 
+    def build(self, frontend, **config):
+        pass
+
     def clean(self, log=None):
         raise NotImplemented('subclass needs to specify behaviour')
 
@@ -107,8 +110,6 @@ class FileStorage(Storage):
 
 class StaticsStorage(FileStorage):
 
-    def clean(self, **config):
-        super(StaticsStorage, self).clean()
     def build(self, frontend, **config):
         # TODO: if statics
         from django.contrib.staticfiles.finders import get_finders

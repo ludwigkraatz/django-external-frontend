@@ -45,6 +45,9 @@ class Command(BaseCommand):
             if selected_frontend and frontend.NAME != selected_frontend:
                 continue
 
+            for storage in frontend.USED_STORAGE:
+                storage.build(frontend, log=build_log)  # collecting statics
+
             started += 1
             frontend_stdout = build_log.with_indent('Frontend: "%s"' % frontend.NAME)
 
