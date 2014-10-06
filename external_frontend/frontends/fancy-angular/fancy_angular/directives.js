@@ -96,7 +96,19 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
             if (callback)callback()
         }
     };
-    $scope.__widgetType = widgetConfig.widgetType;
+    
+    $scope.__widgetName = widgetConfig.widgetName;
+    $scope.__widgetNamespace = widgetConfig.widgetNamespace;
+    $scope.__widgetInstanceName = widgetConfig.widgetInstanceName;
+    $scope.generateWidgetName = function(){
+        return $scope.__widgetNamespace + '.' + $scope.__widgetName + (
+                    $scope.__widgetInstanceName ? ('<' + $scope.__widgetInstanceName + '>') : ''
+                    );
+    }
+    $scope.__state = widgetConfig.widgetState;
+    if ($parentScope.__state) {
+        $scope.__state = $.extend({}, $parentScope.__state[$scope.generateWidgetName()], $scope.__state);
+    }
     $scope.__defaultWidgetView = widgetConfig.widgetView;
     $scope.__widgetData = widgetConfig.widgetResource ? (widgetConfig.widgetResource): null;
     $scope.__widgetReference = widgetConfig.widgetReference;
@@ -327,7 +339,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                             frontendCore.addWidget(
                                                    currentElement,
                                                    widgetConfig.widgetTemplate!="false" ? content : null,
-                                                   widgetConfig.widgetType,
+                                                   widgetConfig.widgetName,
                                                    js,
                                                    currentScope
                               );
@@ -381,17 +393,73 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
             prepareTemplate(cachedTemplate[0], cachedTemplate[1], undefined, true);
           }else
           if (src) {
-            // TODO: require:plugin!src
-            var namespace = widgetConfig.widgetNamespace, identifier = src;
-            var parts = src.split('.');
-            if (parts.length > 1){
-                namespace = parts[0];
-                identifier = parts[1];
+            function parseState(stateString) {
+                var stringScope = stateString[0] == '#' ? 'view' : 'state',
+                    state = {},
+                    root_state = {'.': state},
+                    activeView = undefined,
+                    parts;
+                stateString = stateString.slice(1);
+
+                if (stringScope == 'view') {
+                    activeView = stateString.split(':')[0];
+                    stateString = stateString.indexOf(':') != -1 ? stateString.split(':')[1] : '';
+                }else if (stateString.indexOf('#') != -1) {
+                    parts = stateString.split('#');
+                    activeView = parts[1];
+                    stateString = parts[0];
+                }
+                state['activeView'] = activeView;
+                
+                if (stateString[0] == '!'){
+                    stateString = window.atob(stateString.slice(1));
+                }
+                
+                if (stateString[0] == '{'){
+                    $.extend(stringScope == 'state' ? root_state : state, JSON.parse(stateString)); // TODO: un-urlify
+                }else if (stateString[0] == '['){
+                    state['uuid_list'] = JSON.parse(stateString); // TODO: un-urlify
+                }else {
+                    state['uuid'] = stateString;
+                }
+                return root_state;
             }
+            function prepareWidgetConfig(widgetConfig){
+                var parts = widgetConfig.widgetIdentifier.indexOf(':') != -1 ?
+                                            widgetConfig.widgetIdentifier.split(':')
+                                            : (widgetConfig.widgetIdentifier.indexOf('#') != -1 ?
+                                                    widgetConfig.widgetIdentifier.split('#')
+                                                    : [widgetConfig.widgetIdentifier]
+                                                );
+                widgetConfig.widgetXXX = parts[0];
+                widgetConfig.widgetState = parts.length > 1 ?
+                                                parseState(widgetConfig.widgetIdentifier.slice(
+                                                                widgetConfig.widgetXXX.length,
+                                                                widgetConfig.widgetIdentifier.length
+                                                            )
+                                                )
+                                                : null;
+
+                parts = widgetConfig.widgetXXX.split('<');
+                widgetConfig.widgetInstanceName = parts.length > 1 ? parts[1].slice(0, parts[1].length -1) : null;
+                parts = parts[0].split('.');
+                // TODO: NamespaceProvider.lookup(scope, widgetConfig);
+                widgetConfig.widgetNamespace = parts.length > 1 ? parts[0] : frontendConfig.widgets.namespace;
+                widgetConfig.widgetName = parts.length > 1 ? parts[1] : parts[0];
+                widgetConfig.widgetSource = widgetConfig.widgetNamespace + ':' + widgetConfig.widgetName;
+                widgetConfig.widgetData = widgetConfig.widgetResource = widgetConfig.widgetState ?
+                    widgetConfig.widgetState['.']['uuid'] : null;
+                widgetConfig.widgetView = widgetConfig.widgetState ?
+                    widgetConfig.widgetState['.']['activeView'] : null;
+            }
+            // TODO: require:plugin!src
+            prepareWidgetConfig(widgetConfig);
+            var namespace = widgetConfig.widgetNamespace,
+                identifier = widgetConfig.widgetSource;
             var error = 0;
             var dependencies = [];
             if (widgetConfig.widgetJS!="false") {
-                widgetConfig.required.push('fancyPlugin!widget:'+ (widgetConfig.widgetJS || (namespace?namespace+':':'') + identifier))
+                widgetConfig.required.push('fancyPlugin!widget:'+ widgetConfig.widgetSource)
                 dependencies.push('js');
             }
             /*if (widgetConfig.widgetTemplate!="false") {
@@ -460,7 +528,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                 controller: angular.noop,
                 compile: function(element, attr) {
                     var widgetParts = attr['loadWidget'].split('#'),
-                        widgetIdentifier = widgetParts[0],
+                        widgetIdentifier = attr['loadWidget'], //widgetParts[0],
                         widgetView = widgetParts.length==2 ? widgetParts[1] : null,
                         widgetReference = attr['widgetReference'],
                         widgetTemplate = attr['widgetTemplate'],
