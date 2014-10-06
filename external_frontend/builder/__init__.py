@@ -131,6 +131,7 @@ class FrontendBuilder(object):
         self.css_vars = {}
         self.css_config = SortedDict()
         self.compiler_queues = SortedDict((
+            ('config', SortedDict({None: SortedDict()})),
             ('js-config', SortedDict({None: SortedDict()})),
             ('css-config', SortedDict({None: SortedDict()})),
             ('sass', SortedDict({None: SortedDict()})),
@@ -702,7 +703,7 @@ class FrontendBuilder(object):
 
         compile_as = None
         if path == self.get_frontend_config_path():
-            compile_as = 'js-config'
+            compile_as = 'config'
             config['new_path'] = 'config.json'  # todo self.js_config_dest
             config['rel_path'] = None
         elif (path.startswith('./' + self.name + '/css/') or path.startswith(self.name + '/css/')) and path.split('.')[-1] in ['scss', 'sass', 'css'] and not path.endswith(os.path.sep + 'core.scss'):
@@ -777,6 +778,9 @@ class FrontendBuilder(object):
         return False
 
     def compile_as(self, compile_as, content=None, content_list=None, **config):
+        if compile_as == 'config':
+            self.compile_as('js-config', **config)
+            return False
         if compile_as == 'js-config':
             self.update_configuration(content=content, **config)
             return False
