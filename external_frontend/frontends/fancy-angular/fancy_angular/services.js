@@ -55,6 +55,9 @@ define(['fancyPlugin!angular'], function (angular) {
             fromFixture: function(content){
                 // directives.js, line 84,
                 // maybe even give fixtures down to api object
+            },
+            blank: function(settings){
+                return frontendCore.endpoint.ajax.blank(settings)
             }
         }
     };
