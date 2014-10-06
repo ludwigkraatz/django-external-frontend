@@ -88,7 +88,7 @@ config = {
             'basic-frontend': {
                 'NAME': 'basic-frontend',  # TODO: settings should set this automatically
                 'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'basic'),
-                #'DEPENDS_ON': ['fancy-frontend-lib'],
+                'DEPENDS_ON': ['normalize'],
                 'PROTECTED': True
             },
             'fancy-frontend': {
@@ -105,6 +105,20 @@ config = {
                 'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'fancy-angular'),
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
+            },
+            'normalize': {
+                'NAME': 'normalize',
+                'SRC': 'https://github.com/necolas/normalize.css.git',
+                'FILTER': '^./normalize.css$',
+                'TYPE': 'css',
+                'CONFIG': {
+                    'unversioned': [
+                        './normalize.css'
+                    ],
+                    'rename': {
+                        #'^./normalize.css$': './normalize.scss'
+                    }
+                }
             }
         }
     },
