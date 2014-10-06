@@ -747,13 +747,14 @@ class FrontendBuilder(object):
                 config['content'] = self.precompile_as('sass', config['content'])
                 config['path'].replace('.sass', '.scss')
 
-            compile_path = os.path.join(self.compile_dir, 'css', config['rel_path'])
-            compile_dir = os.path.sep.join(compile_path.split(os.path.sep)[:-1])
-            main_builder.add_css_folder(os.path.realpath(os.path.join(self.compile_dir, 'css')))
-            if not os.path.exists(compile_dir):
-                os.makedirs(compile_dir)
-            with open(compile_path, 'w+') as file:
-                file.write(config['content'])
+            if not compile_as.endswith('config'):
+                compile_path = os.path.join(self.compile_dir, 'css', config['rel_path'])
+                compile_dir = os.path.sep.join(compile_path.split(os.path.sep)[:-1])
+                main_builder.add_css_folder(os.path.realpath(os.path.join(self.compile_dir, 'css')))
+                if not os.path.exists(compile_dir):
+                    os.makedirs(compile_dir)
+                with open(compile_path, 'w+') as file:
+                    file.write(config['content'])
 
         # compile
         if not build:
