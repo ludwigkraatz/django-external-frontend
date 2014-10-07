@@ -1,8 +1,6 @@
 define(['fancyPlugin!app:fancy-frontend:widgets', 'fancyPlugin!fancyFrontendConfig', 'fancyPlugin!services'], function($, config, services){
     $(function() {
 
-        var widgetConfig = $[config.apps['fancy-angular'].defaults_namespace]._widgetConfig;
-
             $.widget( config.apps['fancy-angular'].namespace + '.core', $[config.apps['fancy-frontend'].namespace].core, {
                     options: {
                     },
