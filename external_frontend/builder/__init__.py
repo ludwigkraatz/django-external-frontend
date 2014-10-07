@@ -119,11 +119,13 @@ class FrontendBuilder(object):
 
         self.reset_observer()
 
-        def get_dependencies():
+        def get_dependencies(main_builder=None):
             #raise Exception(str(settings.__dict__['_dict']))
             #raise Exception(str([setting.NAME for setting in settings.DEPENDS_ON]))
             #raise Exception([str(setting) for setting in settings.DEPENDS_ON])
-            return settings.DEPENDS_ON
+            if main_builder is None:
+                return settings.DEPENDS_ON
+            return (entry for entry in settings.DEPENDS_ON if entry != main_builder)
         self.get_dependencies = get_dependencies
         self.dependency_map = {}
 
@@ -196,18 +198,20 @@ class FrontendBuilder(object):
     def run_dependencies(self, storages, update, log=None, main_builder=None): # obsolete
         main_builder = main_builder or self
         config = {}
-        for dependency in self.get_dependencies():
-            dependency_log = log.with_indent('loading dependency "%s"' % dependency)
-            if dependency.run(storages=storages, log=dependency_log, main_builder=main_builder, update=update):
-                self.set_default_config(dependency.config)
-            else:
-                log.write('couldn\'t build dependency "%s"' % dependency)
+        if main_builder != self:
+            for dependency in self.get_dependencies():
+                dependency_log = log.with_indent('loading dependency "%s"' % dependency)
+                if dependency.run(storages=storages, log=dependency_log, main_builder=main_builder, update=update):
+                    self.set_default_config(dependency.config)
+                else:
+                    log.write('couldn\'t build dependency "%s"' % dependency)
         return config
 
     def init_dependencies(self, main_builder=None, **config):
         main_builder.dependency_map[self.name] = self
-        for dependency in self.get_dependencies():
-            dependency.init_dependencies(main_builder=main_builder)
+        #if main_builder != self:
+        for dependency in self.get_dependencies(main_builder):
+            dependency.init_dependencies(main_builder=main_builder)  # TODO: this doesnt look thread safe
 
     def register_handler(self, event_handler, path):
         if self.observer is None:
@@ -228,7 +232,7 @@ class FrontendBuilder(object):
     def init_observers(self, **config):
         started = 0
         main_builder = config.get('main_builder', None)
-        for dependency in self.get_dependencies():
+        for dependency in self.get_dependencies(main_builder):
             started += dependency.init_observers(**config)
 
         if main_builder in self.observers_watcher:
@@ -258,7 +262,7 @@ class FrontendBuilder(object):
 
     def stop_watching(self, log, main_builder=None):
         main_builder = main_builder or self
-        for dependency in self.get_dependencies():
+        for dependency in self.get_dependencies(main_builder):
             dependency.stop_watching(log=log, main_builder=main_builder)
 
         if main_builder in self.observers_watcher:
@@ -323,7 +327,7 @@ class FrontendBuilder(object):
 
         #2 init config file(s)
         try:
-            self.load_config()
+            self.load_config(**config)
         except:
             config.get('log').write('config not loaded')
             return False
@@ -405,7 +409,7 @@ class FrontendBuilder(object):
 
     def collect(self, **config):
         log = config.get('log', None)
-        for dependency in self.get_dependencies():
+        for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.collect(**config)
         main_builder = config['main_builder']
         current_cache_dir = self.cache_dir_frontend
@@ -435,17 +439,17 @@ class FrontendBuilder(object):
                         os.symlink(os.path.join(self.src, path), current_cache_dir + os.path.sep + path)
 
     def update_db(self, **config):
-        for dependency in self.get_dependencies():
+        for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.update_db(**config)
 
         if self.skip_db:
             return
         pass
 
-    def load_config(self):
+    def load_config(self, **config):
         current_cache_dir = self.cache_dir_frontend
-        for dependency in self.get_dependencies():
-            self.config = dict_merge(self.config, dependency.load_config())
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            self.config = dict_merge(self.config, dependency.load_config(**config))
             #main_builder.set_default_config(self.config)
 
         # load config file
@@ -473,7 +477,7 @@ class FrontendBuilder(object):
         return self.config
 
     def build_from_cache(self, **config):
-        for dependency in self.get_dependencies():
+        for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.build_from_cache(**config)
 
         log = config.get('log')
@@ -511,10 +515,10 @@ class FrontendBuilder(object):
         config['start']['frontends'] = []
 
         for app, app_config in self.get_config('apps', default={}).items():
-            defaults_namespace = 'fancy-frontend' # TODO from cinfig
+            prefix = app_config.get('namespace', '')
+            defaults_namespace = self.get_config('requirejs', 'defaults', app, default=prefix)
             if not isinstance(app_config, dict):
                 app_config = {}
-            prefix = app_config.get('namespace', '')
             apps = {}
             apps[app] = {
                 'namespace': prefix,
