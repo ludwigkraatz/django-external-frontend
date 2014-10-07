@@ -40,7 +40,7 @@ require.config({
           "module": "js"
         },
         "template": {
-          "path": "/{app}/widgets/{template}/{template}{theme}.{extension}",
+          "path": "/{app}/widgets/{widget}/{template}{theme}.{extension}",
           "extension": "html",
           "module": "partials"
         },
