@@ -224,7 +224,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
 
         },
         
-        load_assets: function(settings){
+        load_dependencies: function(settings){
             for (var key in settings.templates){
                 var template = 'fancyPlugin!template:' + (settings.templates[key]+':'+settings.templates[key]);
                 settings.scope.__required.push(template);
