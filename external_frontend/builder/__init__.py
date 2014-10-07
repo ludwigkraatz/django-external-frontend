@@ -580,7 +580,7 @@ class FrontendBuilder(object):
         if self.filter and not re.compile(self.filter).match(path):
             ignore = True
 
-        for expr, replacement in self.get_config('rename', default={}).iteritems():
+        for expr, replacement in (self.get_config('rename', default={}) or {}).iteritems():  # TODO: why is ehere "or {}" needed.. there is a bug in default={}..
             path = re.compile(expr).sub(replacement, path)
 
         if self.get_config('staging', 'filtered_files') and self.get_config('staging', 'configurations') and any(
