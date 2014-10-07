@@ -7,7 +7,7 @@ define(['fancyPlugin!angular'], function (angular) {
   // In this case it is a simple value service.
 	return angular.module('services', ['config'])
 		.value('version', '0.1')
-        .provider('$ObjectProvider', ['frontendCore', function(frontendCore) {
+        .provider('$ApiProvider', ['frontendCore', function(frontendCore) {
     // In the provider function, you cannot inject any
     // service or factory. This can only be done at the
     // "$get" method.
@@ -17,7 +17,10 @@ define(['fancyPlugin!angular'], function (angular) {
     this.$get = function($q) {
         var stage = this.stage;
         return {
-            get: function(settings) {
+            get: function(x, y , z){
+                return frontendCore.endpoint.ajax.access.apply(frontendCore.endpoint.ajax, arguments)
+            },
+            _get: function(settings) {
                 var type = settings.target,
                     selector = settings.data;
                 if (stage == 'fixtures') {
@@ -51,10 +54,6 @@ define(['fancyPlugin!angular'], function (angular) {
                 }else{// frontendCore.endpoint
                     return frontendCore.endpoint.ajax.access('object').get(settings)
                 }
-            },
-            fromFixture: function(content){
-                // directives.js, line 84,
-                // maybe even give fixtures down to api object
             },
             blank: function(settings){
                 return frontendCore.endpoint.ajax.blank(settings)
