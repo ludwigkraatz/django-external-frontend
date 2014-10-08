@@ -435,11 +435,17 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
         $scope.__fixtures[name] = undefined;
     };
     
+    $scope._watchedObjects = [];
     $scope._initAttrBindings = function(obj){
         if (!!!obj.__event_handler) {
             $scope.log.debug('skip init scope.attr bindings for', obj, 'because seems to be attribute')
             return
         }
+        if ($scope._watchedObjects.indexOf(obj) != -1) {
+            $scope.log.debug('skip init scope.attr bindings for', obj, 'because seems to be bound already to this scope')
+            return
+        }
+        $scope._watchedObjects.push(obj);
         $scope.log.debug('init scope.attr bindings for', obj)
         obj.bind('post-*', function(event, apiResult){
             $scope.log.event.apply(null, arguments)
