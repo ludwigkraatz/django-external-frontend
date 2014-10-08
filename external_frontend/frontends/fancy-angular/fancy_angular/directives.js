@@ -14,6 +14,153 @@ function isDefined(args) {
     return args !== undefined
 }
 
+
+function parseState(widgetIdentifier) {
+    var nextElement,
+        oldElement = null,
+        state_string = widgetIdentifier,
+        widget_source,
+        currentElement,
+        state = {'resource': {}},
+        root_state = {'.': state},
+        seperators = [  '{',  // followed by JSON state
+                      // or as resource specific shortcuts
+                        '<>',  // followed, and closed with >, by instance name nad resourceReference if '.' seperated name
+                        ':',  // display the followed object (UUID or !)
+                        //'!',  // as indicator for showing the primary element of a list
+                        '[]',  // indicating a list of resources, closed by ]
+                        '#',  // active View
+                        '?'   // activity widget instance / lookup
+        ];
+        
+        
+
+    function walkToNextSeperator(){
+        var foundCurrent = false,
+            found = false,
+            withTerminator = false,
+            walked_element = null;
+        for (var index in seperators) {
+            var value = seperators[index][0];
+            if (!foundCurrent && nextElement && nextElement != value) {
+                continue
+            }
+            if (foundCurrent === false) {
+                foundCurrent = true;
+                if (nextElement) {
+                    value = seperators[index][1]
+                    
+                    if (!value) {
+                        continue
+                    }
+                    withTerminator = true
+                }
+            }
+
+            if (state_string.indexOf(value) != -1) {
+                found = true;
+                var seperator_index = state_string.indexOf(value);
+                walked_element = state_string.slice(0, seperator_index);
+                var old = state_string;
+                state_string = state_string.slice(seperator_index + (withTerminator ? 1 : 0), state_string.length);
+                break
+            }
+        }
+        if (foundCurrent) {
+            if (!found) {
+                walked_element = state_string;
+                state_string = '';
+            }
+            return walked_element
+        }
+        return null
+    }
+
+    function next() {
+        if (state_string.length) {
+            oldElement = nextElement;
+            nextElement = state_string[0];
+            state_string = state_string.slice(1);
+            currentElement = walkToNextSeperator();
+        }else{
+            nextElement = null;
+        }
+        
+    }
+    
+    // go to the first seperator
+    widget_source = walkToNextSeperator();
+    // check if its base64 encoded
+    if (state_string[0] == '!') {
+        state_string = window.atob(state_string.slice(1));
+    }
+    
+    // activate first found element
+    next()
+    
+    if (nextElement == '{' && currentElement) {
+        root_state = JSON.parse(currentElement);
+
+    }else if (nextElement){
+
+        if (nextElement == '<') {
+            if (currentElement.indexOf('.') != -1) {
+                state.resource.reference = currentElement;
+            }
+            state._name = currentElement;
+
+            next();
+        }
+
+        if (nextElement == ':' && currentElement) {
+            if (currentElement[0] == '!') {
+                state['resource'].asPrimary = true;
+            }else if (currentElement[0] == '['){
+                state['resource']['uuid_list'] = JSON.parse(currentElement);
+            }else {
+                state['resource']['uuid'] = currentElement;
+            }
+            next();
+        }
+
+        if (nextElement == '#' && currentElement) {
+            state['_activeView'] = currentElement;
+            next();
+        }
+
+        if (nextElement == '?') {
+            if (currentElement.length == 0) {
+                state['_active'] = undefined;
+            }else {
+                // TODO: lookup in parents scope
+                state['_active'] = null;
+            }
+            next();
+        }
+    }
+    if (nextElement){
+        throw Error('error parsing widget state')
+    }
+
+    return [widget_source, root_state];
+}
+function prepareWidgetConfig(widgetConfig){
+    var parserResult = parseState(widgetConfig.widgetIdentifier);
+
+    widget_source = parserResult[0];
+    widgetConfig.widgetState = parserResult[1];
+    
+    parts = widget_source.split('.');
+    // TODO: NamespaceProvider.lookup(scope, widgetConfig);
+    widgetConfig.widgetNamespace = parts.length > 1 ? parts[0] : frontendConfig.widgets.namespace;
+    widgetConfig.widgetName = parts.length > 1 ? parts[1] : parts[0];
+    widgetConfig.widgetSource = widgetConfig.widgetNamespace + ':' + widgetConfig.widgetName;
+    widgetConfig.widgetData = widgetConfig.widgetResource = widgetConfig.widgetState ?
+        widgetConfig.widgetState['.']['resource']['uuid'] : null;
+    widgetConfig.widgetView = widgetConfig.widgetState ?
+        widgetConfig.widgetState['.']['_activeView'] : null;
+}
+
 function prepareController($injector, $scope, $parentScope, jsConfig, widgetConfig, frontendCore){
     var $ApiProvider = $injector.get('$ApiProvider'),
         $fancyAngularLocalesLoader = $injector.get('$fancyAngularLocalesLoader'),
@@ -501,6 +648,9 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                     if (value.hasOwnProperty('uuid_list') && value['uuid_list']) {
                         $scope['__'+ key + 'IdList'] = value['uuid_list'];
                     }
+                    if (value.hasOwnProperty('reference') && value['reference']) {
+                        $scope['__'+ key + 'Reference'] = value['reference'];
+                    }
                 }
             }
                 
@@ -622,73 +772,6 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
             prepareTemplate(cachedTemplate[0], cachedTemplate[1], undefined, true);
           }else
           if (src) {
-            function parseState(stateString) {
-                var stringScope = stateString[0] == '#' ? 'view' : 'state',
-                    state = {'resource': {}},
-                    root_state = {'.': state},
-                    activeView = undefined,
-                    parts;
-                stateString = stateString.slice(1);
-
-                if (stringScope == 'view') {
-                    activeView = stateString.split(':')[0];
-                    stateString = stateString.indexOf(':') != -1 ? stateString.split(':')[1] : '';
-                }else if (stateString.indexOf('#') != -1) {
-                    parts = stateString.split('#');
-                    activeView = parts[1];
-                    stateString = parts[0];
-                }
-                state['_activeView'] = activeView;
-                
-                if (stateString[0] == '!'){
-                    stateString = window.atob(stateString.slice(1));
-                }
-                
-                if (stateString[0] == '{'){
-                    $.extend(stringScope == root_state, JSON.parse(stateString)); // TODO: un-urlify
-                }else if (stateString[0] == '['){
-                    state['resource']['uuid_list'] = JSON.parse(stateString); // TODO: un-urlify
-                }else {
-                    state['resource']['uuid'] = stateString;
-                }
-                return root_state;
-            }
-            function prepareWidgetConfig(widgetConfig){
-                var parts = widgetConfig.widgetIdentifier.indexOf(':') != -1 ?
-                                            widgetConfig.widgetIdentifier.split(':')
-                                            : (widgetConfig.widgetIdentifier.indexOf('#') != -1 ?
-                                                    widgetConfig.widgetIdentifier.split('#')
-                                                    : [widgetConfig.widgetIdentifier]
-                                                );
-                widgetConfig.widgetXXX = parts[0];
-                widgetConfig.widgetState = parts.length > 1 ?
-                                                parseState(widgetConfig.widgetIdentifier.slice(
-                                                                widgetConfig.widgetXXX.length,
-                                                                widgetConfig.widgetIdentifier.length
-                                                            )
-                                                )
-                                                : {'.': {'resource': {}}};
-
-                
-                parts = widgetConfig.widgetXXX.split('!');
-                if (parts.length > 1 ) {
-                    widgetConfig.widgetState['.'].resource.asPrimary = true;
-                }
-                parts = parts[0].split('<');
-                if (parts.length > 1 ) {
-                    widgetConfig.widgetState['.']._name = parts[1].slice(0, parts[1].length -1);
-                }
-                
-                parts = parts[0].split('.');
-                // TODO: NamespaceProvider.lookup(scope, widgetConfig);
-                widgetConfig.widgetNamespace = parts.length > 1 ? parts[0] : frontendConfig.widgets.namespace;
-                widgetConfig.widgetName = parts.length > 1 ? parts[1] : parts[0];
-                widgetConfig.widgetSource = widgetConfig.widgetNamespace + ':' + widgetConfig.widgetName;
-                widgetConfig.widgetData = widgetConfig.widgetResource = widgetConfig.widgetState ?
-                    widgetConfig.widgetState['.']['uuid'] : null;
-                widgetConfig.widgetView = widgetConfig.widgetState ?
-                    widgetConfig.widgetState['.']['_activeView'] : null;
-            }
             // TODO: require:plugin!src
             prepareWidgetConfig(widgetConfig);
             var namespace = widgetConfig.widgetNamespace,
