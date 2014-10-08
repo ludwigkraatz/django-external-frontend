@@ -179,6 +179,76 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     };
     $scope.__type = widgetConfig.plugin ? 'plugin' : 'widget';
 
+    
+    $scope.object = function(settings){
+        var name = 'resource',
+            config = settings.config || {};
+        if (settings.hasOwnProperty('config'))delete settings.config;
+        var provider, fixture;
+        $scope.log.debug('getting object', settings, 'fixtures:', $scope.__fixtures);
+        
+        if (settings.target == 'relationship' && config.objList_json) {
+            $scope.log.debug('found relationship in parent');
+            fixture = config.objList_json;
+        }
+        if (!fixture) {
+            for (var name in $scope.__fixtures){
+                if ($scope.__fixtures[name] === undefined) {$scope.log.debug('fixture "', name, '" stil loading')
+                    return undefined // wait until all fixtures are loaded
+                }
+                for (var key in $scope.__fixtures[name]){
+                    var _fixture = $scope.__fixtures[name][key];
+                    if (settings.target == 'relationship') {
+                        if (_fixture.uuid == config.parentObj.__getID()/*$parentScope.__wdigetResource*/ && _fixture[settings.data]) {
+                            $scope.log.debug('found relationship in fixture');
+                            fixture = _fixture[settings.data];
+                            break;
+                        }
+                    }else{   
+                        /*var _data = settings.data;
+                        if (!_data instanceof Array) {
+                            _data = [_data]
+                        }
+                        for (var data in _data) {
+                            if (_fixture.uuid == settings.data) {
+                                if (fixture === null) {
+                                    fixture = []
+                                }
+                                console.log('found uuid fixture');
+                                fixture.push(_fixture);
+                            }
+                        }
+                        if (fixture) {
+                            break;
+                        }*/
+                        if (_fixture.uuid == settings.data) {
+                            $scope.log.debug('found uuid fixture');
+                            fixture = _fixture;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (settings.target == 'relationship') {
+            settings['initialContent'] = config.objList_json;
+            if (!config.parentObj) {
+                return undefined // wait until parent has loaded
+            }
+            $scope.log.debug('parentScope', settings)
+            provider = config.parentObj.get(settings)
+        }else{
+            if (settings.data === undefined) {
+                return undefined
+            }
+            settings['initialContent'] = config.obj_json;
+            provider = $scope._accessApiEndpoint('object').get(settings) //@currentScope.__widgetName
+        }
+        $scope._initAttrBindings(provider);
+        return fixture ? provider.fromFixture(fixture) : provider
+    };
+    
     if ($scope.__type == 'widget') {
         $scope.resource = {};
         $scope.resourceList = [];
@@ -371,71 +441,6 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
             event.stopPropagation();
     })
     
-    $scope.object = function(settings){
-        var provider, fixture;
-        $scope.log.debug('getting object', settings, 'fixtures:', $scope.__fixtures);
-        
-        if (settings.target == 'relationship' && $scope.__resourceIdList) {
-            $scope.log.debug('found relationship in parent');
-            fixture = $scope.__resourceIdList;
-        }
-        if (!fixture) {
-            for (var name in $scope.__fixtures){
-                if ($scope.__fixtures[name] === undefined) {$scope.log.debug('fixture "', name, '" stil loading')
-                    return undefined // wait until all fixtures are loaded
-                }
-                for (var key in $scope.__fixtures[name]){
-                    var _fixture = $scope.__fixtures[name][key];
-                    if (settings.target == 'relationship') {
-                        if (_fixture.uuid == $parentScope.__wdigetResource && _fixture[settings.data]) {
-                            $scope.log.debug('found relationship in fixture');
-                            fixture = _fixture[settings.data];
-                            break;
-                        }
-                    }else{   
-                        /*var _data = settings.data;
-                        if (!_data instanceof Array) {
-                            _data = [_data]
-                        }
-                        for (var data in _data) {
-                            if (_fixture.uuid == settings.data) {
-                                if (fixture === null) {
-                                    fixture = []
-                                }
-                                console.log('found uuid fixture');
-                                fixture.push(_fixture);
-                            }
-                        }
-                        if (fixture) {
-                            break;
-                        }*/
-                        if (_fixture.uuid == settings.data) {
-                            $scope.log.debug('found uuid fixture');
-                            fixture = _fixture;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (settings.target == 'relationship') {
-            settings['initialContent'] = $scope['resourceList'];
-            if (!$parentScope['_resource']) {
-                return undefined // wait until parent has loaded
-            }
-            $scope.log.debug('parentScope', settings)
-            provider = $parentScope['_resource'].get.apply($parentScope['_resource'], [settings])
-        }else{
-            if (settings.data === undefined) {
-                return undefined
-            }
-            settings['initialContent'] = $scope['resource'];
-            provider = $scope._accessApiEndpoint('object').get(settings) //@currentScope.__widgetName
-        }
-        $scope._initAttrBindings(provider);
-        return fixture ? provider.fromFixture(fixture) : provider
-    };
     $scope.init = function($widget){
         $scope['!private'] = {}
         $scope['!private'].$widget = $widget;
