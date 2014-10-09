@@ -625,6 +625,14 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     $scope.init = function($widget){
         $scope['!private'] = {}
         $scope['!private'].$widget = $widget;
+        // TODO: if debug
+        $widget.element.on('inspect.fancy_angular.directive', function(event, callback){
+            if (callback){
+                callback('scope', $scope);
+            }else{
+                console.log('scope', $scope)
+            }
+        })
         if ($widget.object) {
             $scope.__as = $widget.object; // TODO: use for ApiResources
         }
@@ -697,6 +705,8 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
         }
 
         function fancyWidgetWatchAction(widgetIdentifier) {
+          $element.addClass(frontendCore.config.frontend_generateClassName('state-initializing'));
+          
           var src = widgetIdentifier.split(':')[0];
           var afterAnimation = function() {
             if (isDefined(widgetConfig.autoScrollExp) && (!widgetConfig.autoScrollExp || scope.$eval(widgetConfig.autoScrollExp))) {
@@ -765,15 +775,13 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                 
                       
                       
-          }
+          }     
 
           var cachedTemplate = $templateCache.get(widgetIdentifier);
           if (cachedTemplate) {
             prepareTemplate(cachedTemplate[0], cachedTemplate[1], undefined, true);
           }else
           if (src) {
-            // TODO: require:plugin!src
-            prepareWidgetConfig(widgetConfig);
             var namespace = widgetConfig.widgetNamespace,
                 identifier = widgetConfig.widgetSource;
             var error = 0;
@@ -828,7 +836,39 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
           }
         }
         //scope.$watch($sce.parseAsResourceUrl('"'+widgetConfig.widgetIdentifier+'"'), fancyWidgetWatchAction);
-        fancyWidgetWatchAction(widgetConfig.widgetIdentifier);
+        
+        prepareWidgetConfig(widgetConfig);
+        $element.addClass(frontendCore.config.frontend_generateClassName('instance'));
+        $element.addClass(frontendCore.config.frontend_generateClassName('object-' + widgetConfig.widgetName))
+        
+        // TODO: if debug
+        $element.bind('inspect.fancy_angular.directive', function(event, callback){
+            if (callback){
+                callback('element', $element);
+            }else{
+                console.log('element', $element)
+            }
+        })
+        
+        if (widgetConfig.widgetState && widgetConfig.widgetState.hasOwnProperty('.') && widgetConfig.widgetState['.'].hasOwnProperty('_active')) {
+            if (widgetConfig.widgetState['.']._active === undefined) { 
+                    $element.addClass(frontendCore.config.frontend_generateClassName('action'))
+                if (widgetConfig.icon) {
+                    $element.addClass(frontendCore.config.frontend_generateClassName('shape-icon'))
+                }
+                var startupHandler = function(){
+                    $element.unbind('click', startupHandler);
+                    $element.removeClass(frontendCore.config.frontend_generateClassName('action'));
+                    fancyWidgetWatchAction(widgetConfig.widgetIdentifier, widgetConfig);
+                }
+                $element.bind('click', startupHandler)
+                return
+            }else if (widgetConfig.widgetState['.']._active === false) {
+                //$element.remove()
+                return
+            }
+        }
+        fancyWidgetWatchAction(widgetConfig.widgetIdentifier, widgetConfig);
     };
  };
 
@@ -875,7 +915,9 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                             'onloadExp': onloadExp,
                             'autoScrollExp': autoScrollExp,
                             'plugin': false,
-                            'required': []
+                            'required': [],
+                            'icon': attr['actionIcon'],
+                            'viewContainer': attr['viewContainer']
                         };
 
                         element.removeAttr('load-widget')
@@ -923,7 +965,9 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
                             'onloadExp': onloadExp,
                             'autoScrollExp': autoScrollExp,
                             'plugin': true,
-                            'required': []
+                            'required': [],
+                            'icon': attr['actionIcon'],
+                            'viewContainer': attr['viewContainer']
                         };
                         // TODO: test if controller is available, otherwise ignore this widget
                         element.removeAttr('load-plugin')
