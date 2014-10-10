@@ -243,7 +243,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
             }
             for (var key in settings.css){
                 // TODO: test if file is not loaded with core.css
-                var css = 'fancyPlugin!css:' + (settings.css[key]+':'+settings.css[key]);
+                var css = 'fancyPlugin!css:' + (settings.css[key]);
                 settings.scope.__required.push(css);
                 require([css], function(response){
                     if (settings.callback){

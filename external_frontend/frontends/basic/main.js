@@ -45,9 +45,9 @@ require.config({
           "module": "partials"
         },
         "css": {
+          "widget_path": "/{app}/widgets/{widget}/{file}{theme}.css",
           "path": "/{app}/{path}.css",
           "module": "css",
-          "module": "css"
         },
         "fixture": {
           "path": "/{app}/widgets/{widget}/fixtures/{fixture}.json",

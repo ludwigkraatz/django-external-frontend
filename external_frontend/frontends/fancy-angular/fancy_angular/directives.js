@@ -848,6 +848,7 @@ function get_linker_func(widgetConfig, $compile, $templateCache,   $anchorScroll
             }else{
                 console.log('element', $element)
             }
+            //event.stopPropagation();
         })
         
         if (widgetConfig.widgetState && widgetConfig.widgetState.hasOwnProperty('.') && widgetConfig.widgetState['.'].hasOwnProperty('_active')) {
