@@ -669,6 +669,12 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                     if (value.hasOwnProperty('reference') && value['reference']) {
                         $scope['__'+ key + 'Reference'] = value['reference'];
                     }
+                    if (value.hasOwnProperty('asNew') && value['asNew']) {
+                        $scope['__'+ key + 'AsNew'] = True;
+                    }
+                    if (value.hasOwnProperty('filter') && value['filter']) {
+                        $scope['__'+ key + 'Filter'] = value['filter'];
+                    }
                 }
             }
                 
