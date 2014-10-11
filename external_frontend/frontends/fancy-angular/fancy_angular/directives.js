@@ -395,16 +395,35 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                 return undefined // wait until parent has loaded
             }
             $scope.log.debug('parentScope', settings)
-            provider = config.parentObj.get(settings)
+            provider = config.parentObj
         }else{
             if (settings.data === undefined) {
                 return undefined
             }
             settings['initialContent'] = config.obj_json;
-            provider = $scope._accessApiEndpoint('object').get(settings) //@currentScope.__widgetName
+            if ($scope.__endpoint) {
+                var endpoints = $scope.__endpoint.split('/').reverse();
+                initialEndpoint = endpoints.pop();
+                if (!initialEndpoint) {
+                    initialEndpoint = endpoints.pop()
+                }
+                if (initialEndpoint == 'data') {
+                    settings.target = 'id'; // currently the data endpoints use the id attribute
+                }
+                
+                provider = $scope._accessApiEndpoint(initialEndpoint);
+                var endpoint;
+                while (endpoints.length && (endpoint = endpoints.pop())) {
+                    if (!endpoint) continue;
+                    provider = provider.get(endpoint);
+                }
+            }else{
+                provider = $scope._accessApiEndpoint('object')
+            };
         }
-        $scope._initAttrBindings(provider);
-        return fixture ? provider.fromFixture(fixture) : provider
+        result = provider.get(settings) //@currentScope.__asObject
+        $scope._initAttrBindings(result);
+        return fixture ? result.fromFixture(fixture) : result
     };
     
     if ($scope.__type == 'widget') {
@@ -635,6 +654,9 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     $scope.init = function($widget){
         $scope['!private'] = {}
         $scope['!private'].$widget = $widget;
+        if ($widget && $widget.endpoint) {
+            $scope.__endpoint = $widget.endpoint;
+        }
         // TODO: if debug
         $widget.element.on('inspect.fancy_angular.directive', function(event, callback){
             if (callback){
