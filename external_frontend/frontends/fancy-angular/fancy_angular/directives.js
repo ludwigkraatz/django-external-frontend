@@ -27,7 +27,7 @@ function parseState(widgetIdentifier) {
                       // or as resource specific shortcuts
                         '<>',  // followed, and closed with >, by instance name nad resourceReference if '.' seperated name
                         ':',  // display the followed object (UUID or !)
-                        //'!',  // as indicator for showing the primary element of a list
+                        '!',  // as selector, being applied on a list
                         '[]',  // indicating a list of resources, closed by ]
                         '#',  // active View
                         '?'   // activity widget instance / lookup
@@ -112,15 +112,25 @@ function parseState(widgetIdentifier) {
             next();
         }
 
-        if (nextElement == ':' && currentElement) {
-            if (currentElement[0] == '!') {
-                state['resource'].asPrimary = true;
-            }else if (currentElement[0] == '['){
-                state['resource']['uuid_list'] = JSON.parse(currentElement);
+        if (nextElement == ':') {
+            var skipNextWalk = false;
+            if (!currentElement) {
+                next();
+                if (nextElement == '!') {
+                    if (currentElement) {
+                        state['resource'].filter = currentElement;
+                    }
+                    state['resource'].asPrimary = true;
+                }else if (nextElement == '['){
+                    state['resource'].asNew = true;
+                    state['resource']['uuid_list'] = JSON.parse(currentElement);
+                }else{
+                    skipNextWalk = true;
+                }
             }else {
                 state['resource']['uuid'] = currentElement;
             }
-            next();
+            if (!skipNextWalk)next();
         }
 
         if (nextElement == '#' && currentElement) {
