@@ -90,10 +90,25 @@ config = {
             'CONFIG': {}  # TODO: is it safe to use {} here?
         },
         'BUILDER_COLLECTION': {
+            'introspective_api': {
+                'NAME': 'introspective_api',  # TODO: settings should set this automatically
+                'FILTER': '^js/libs/introspective_api/',
+                'CLASS': 'external_frontend.builder.StaticsBuilder',
+                'TYPE': 'lib',
+                'PROTECTED': True,
+                'CONFIG': {
+                    'unversioned': [
+                        'introspective_api/object.js',
+                        'introspective_api/log.js',
+                        'introspective_api/endpoint.js',
+                        'introspective_api/client.js',
+                    ],
+                }
+            },
             'basic-frontend': {
-                'NAME': 'basic-frontend',  # TODO: settings should set this automatically
+                'NAME': 'basic-frontend',
                 'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'basic'),
-                'DEPENDS_ON': ['normalize'],
+                'DEPENDS_ON': ['normalize', 'introspective_api'],
                 'PROTECTED': True
             },
             'fancy-frontend': {
