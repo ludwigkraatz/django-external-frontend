@@ -109,34 +109,6 @@ class FileStorage(Storage):
 
 
 class StaticsStorage(FileStorage):
-
-    def build(self, frontend, **config):
-        # TODO: if statics
-        from django.contrib.staticfiles.finders import get_finders
-        from django.utils.datastructures import SortedDict
-        log = config.get('log')
-        found_files = SortedDict()
-        for finder in get_finders():
-            for path, storage in finder.list([]): # ['CVS', '.*', '*~'] = ignore patterns
-                # Prefix the relative path if the source storage contains it
-                if getattr(storage, 'prefix', None):
-                    prefixed_path = os.path.join(storage.prefix, path)
-                else:
-                    prefixed_path = path
-
-                if prefixed_path not in found_files:
-                    found_files[prefixed_path] = (storage, path)
-                    source = storage.path(path)
-                    new_path = path
-                    if externalFrontendSettings.FILES_FRONTEND_POSTFIX:
-                        new_path += '.' + frontend.NAME
-                    log.write('collecting ', path)
-                    with open(source, 'r') as data:
-                        self.update(new_path, data.read(), log=log)
-
-        #from django.core.management import call_command
-        #call_command('collectstatic', link=True, interactive=False, stdout=config.get('log', None))
-
     def get(self, path, requirejsFallback=None):
         class request(object):  # mockup
             META = {'HTTP_IF_MODIFIED_SINCE': None}

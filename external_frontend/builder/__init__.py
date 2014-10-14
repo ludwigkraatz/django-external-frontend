@@ -17,13 +17,58 @@ class WrappedSource(str):
     def __new__(self, *args, **kwargs):
         return super(WrappedSource, self).__new__(self, args[0])
 
-    def __init__(self, source, handler, method_map):
+    def __init__(self, cache, source, method_map):
         super(WrappedSource, self).__init__(source)
-        self.handler = handler
+        self.source = source
+        self.cache = cache
+        self.handler = None
         self.method_map = method_map
 
     def export(self, destination, log=None):
+        if self.handler is None:
+            self.handler = self.initHandler(self.source, self.cache, log=log)
         return self.method_map['export'](self.handler, destination)
+
+    def initHandler(self, source, cache, log=None):
+        # TODO: move this somehow to method_map
+        if log:
+            log = log.with_indent('init wrappedSource:' + str(source))
+        from git import *
+
+        commit = None
+        if '@' in source.split(':')[-1]:
+            parts = source.split('@')
+            source = '@'.join(parts[0:-1])
+            commit = parts[-1]
+
+        if not os.path.exists(cache + os.path.sep + '.git'):
+            repo = Repo.clone_from(source, cache)
+            if log:
+                log.write('cloning from', source)
+        else:
+            if log:
+                log.write('updating from', source)
+            repo = Repo(cache)
+            repo.git.execute(['git', 'fetch'])
+            if commit:
+                branches = repo.git.execute(['git', 'branch', '--contains', commit])
+                branch = branches.split('\n')[-1].strip()
+                branch = branches.split(' ')[-1] if ' ' in branch else branch
+                if branch == 'branch)':
+                    branch = None
+            else:
+                branch = None
+
+            if branch:
+                repo.git.checkout(branch)  # TODO: is this the right/best way?
+                repo.remotes.origin.pull(branch)
+
+        if commit:  # TODO: this is not always working? maybe always checkout branch first?
+            if log:
+                log.write('using commit', commit)
+            repo.git.checkout(commit)
+
+        return repo
 
 
 wrappedGitMethodMap = {
@@ -41,6 +86,8 @@ def generate_handler(storages, builder, src, log, main_builder):
             prefix = '.' + os.path.sep
             if path.startswith(prefix) and path.find(os.path.sep) > 1:
                 path = path[2:]
+            elif path.find(os.path.sep) <= 0:
+                path = prefix + path
             return path
 
         def on_created(self, event):
@@ -80,21 +127,10 @@ def generate_handler(storages, builder, src, log, main_builder):
     return Handler()
 
 
-class FrontendBuilder(object):
+class Builder(object):
     """
-    the FrontendBuilder does exactly what it's name says:
-    it builds the frontend from sources
-
-    A Mapper object tells it what changed and the Builder then apply the
-    resulting changes and (re)build the frontend
+    it builds the frontend(s) from the specified sources
     """
-    src = None
-    storage = None
-    current_stage = None
-
-    # the source map tells the builder, which files are dependent on which sources
-    source_map = None
-
     def __init__(self, settings=None):
         self.name = settings.NAME
         self.src_name = settings.SRC_NAME or self.name
@@ -104,29 +140,12 @@ class FrontendBuilder(object):
         self.filter = settings.FILTER
 
         self.cache_dir = (externalFrontendSettings.CACHE_ROOT + os.path.sep + 'external_frontend.cache')
-        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote' + os.path.sep + self.name
-
         self.cache_dir_src = self.cache_dir + os.path.sep + 'src'
-        self.cache_dir_frontend = self.cache_dir_src + os.path.sep + self.name
-        self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + os.path.sep + self.name
-        self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + os.path.sep + self.name
-        self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + os.path.sep + self.name
         self.compile_root = self.cache_dir + os.path.sep + 'compiled'
-        self.compile_dir = self.compile_root + os.path.sep + self.name
 
-        self.init_src(settings.SRC)
-        self.src_real = os.path.realpath(self.src)
+        self.cache_dir_current = self.cache_dir_src + os.path.sep + self.name
 
         self.reset_observer()
-
-        def get_dependencies(main_builder=None):
-            #raise Exception(str(settings.__dict__['_dict']))
-            #raise Exception(str([setting.NAME for setting in settings.DEPENDS_ON]))
-            #raise Exception([str(setting) for setting in settings.DEPENDS_ON])
-            if main_builder is None:
-                return settings.DEPENDS_ON
-            return (entry for entry in settings.DEPENDS_ON if entry != main_builder)
-        self.get_dependencies = get_dependencies
         self.dependency_map = {}
 
         self.source_map = {}
@@ -156,62 +175,87 @@ class FrontendBuilder(object):
         }
         self.css_sources = SortedDict()
 
-    def init_src(self, source):
-        if source.startswith('git@') or (source.startswith('https://') and '.git' in source):  # TODO: debug output (cloned to local repo / updated local repo)
-            from git import *
+    def clean(self, storages, log=None, **config):
+        if os.path.exists(self.compile_root):
+            shutil.rmtree(self.compile_root)
+        for path in os.listdir(self.cache_dir_src):
+            path = os.path.join(self.cache_dir_src, path)
+            if not os.path.islink(path) and os.path.isdir(path):
+                shutil.rmtree(path)
 
-            commit = None
-            if '@' in source.split(':')[-1]:
-                parts = source.split('@')
-                source = '@'.join(parts[0:-1])
-                commit = parts[-1]
+    def collect(self, **config):
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            dependency.collect(**config)
 
-            if not os.path.exists(self.cache_dir_remote + os.path.sep + '.git'):
-                repo = Repo.clone_from(source, self.cache_dir_remote)
-            else:
-                repo = Repo(self.cache_dir_remote)
-                repo.git.execute(['git', 'fetch'])
-                if commit:
-                    branches = repo.git.execute(['git', 'branch', '--contains', commit])
-                    branch = branches.split('\n')[-1].strip()
-                    branch = branches.split(' ')[-1] if ' ' in branch else branch
-                    if branch == 'branch)':
-                        branch = None
-                else:
-                    branch = None
+        current_cache_dir = self.cache_dir_current
+        if not os.path.exists(current_cache_dir):
+            os.mkdir(current_cache_dir)
 
-                if branch:
-                    repo.git.checkout(branch)  # TODO: is this the right/best way?
-                    repo.remotes.origin.pull(branch)
+    def build_from_cache(self, **config):
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            dependency.build_from_cache(**config)
 
-            if commit:  # TODO: this is not always working? maybe always checkout branch first?
-                repo.git.checkout(commit)
+        log = config.get('log')
+        log = log.with_indent('building ' + self.name)
+        current_source_dir = self.cache_dir_current
+        for root, dirnames, filenames in os.walk(current_source_dir):
+            relative_path = os.path.relpath(root, current_source_dir)
+            for path in filenames:
+                if path.startswith('.') or ((os.path.sep + '.') in relative_path):
+                    continue
+                path = os.path.join(relative_path, path)
+                if log:
+                    config['log'] = log.with_indent(path)
+                with open(os.path.join(current_source_dir, path), 'r') as content:
+                    self.update(path, content.read(), build=True, **config)
 
-            self.src = WrappedSource(self.cache_dir_remote, repo, wrappedGitMethodMap)
-        else:
-            self.src = source
+    def build_from_db(self, **config):
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            dependency.build_from_db(**config)
 
-        if not os.path.exists(self.src):
-            raise Exception('FrontendBuilder need to be initialized with existing src directory.\
-                        "%s" does not exist' % self.src)
+    def update_db(self, **config):
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            dependency.update_db(**config)
 
-    def run_dependencies(self, storages, update, log=None, main_builder=None): # obsolete
-        main_builder = main_builder or self
-        config = {}
-        if main_builder != self:
-            for dependency in self.get_dependencies():
-                dependency_log = log.with_indent('loading dependency "%s"' % dependency)
-                if dependency.run(storages=storages, log=dependency_log, main_builder=main_builder, update=update):
-                    self.set_default_config(dependency.config)
-                else:
-                    log.write('couldn\'t build dependency "%s"' % dependency)
-        return config
-
-    def init_dependencies(self, main_builder=None, **config):
+    def init_dependencies(self, **config):
+        main_builder = config.get('main_builder')
         main_builder.dependency_map[self.name] = self
-        #if main_builder != self:
         for dependency in self.get_dependencies(main_builder):
             dependency.init_dependencies(main_builder=main_builder)  # TODO: this doesnt look thread safe
+
+    def build(self, **config):
+        raise Exception('use a subclass, that implements this method')
+
+    def get_dependencies(self, main_builder):
+        raise Exception('use a subclass, that implements this method')
+
+    def init_observers(self, **config):
+        started = 0
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            started += dependency.init_observers(**config)
+        return started
+
+    def observe_path(self, path, **config):
+        handler = config.get('launcher')(
+            config.get('storages'),
+            self,
+            path,
+            log=config['log'].async(),
+            main_builder=config.get('main_builder')
+        )
+        watcher = self.register_handler(handler, path)
+
+        self.observers_watcher[config.get('main_builder', None)] = (handler, watcher)
+        config['log'].write('started observer for "%s" on %s' % (self.name, path))
+
+    def watch(self, **config):
+        config['watch'] = True
+        log = config['log']
+        if self.build(**config):
+            return True
+        else:
+            log.write('no observers started, because build failed')
+            return False
 
     def register_handler(self, event_handler, path):
         if self.observer is None:
@@ -229,37 +273,6 @@ class FrontendBuilder(object):
         self.observer = None
         self.observers_watcher = {}
 
-    def init_observers(self, **config):
-        started = 0
-        main_builder = config.get('main_builder', None)
-        for dependency in self.get_dependencies(main_builder):
-            started += dependency.init_observers(**config)
-
-        if main_builder in self.observers_watcher:
-            return started
-
-        path = self.src_real
-        if isinstance(self.src, WrappedSource):
-            if os.path.islink(self.cache_dir_frontend):
-                path = os.path.realpath(self.cache_dir_frontend)
-            else:
-                config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
-                return started
-
-        handler = config.get('launcher')(
-            config.get('storages'),
-            self,
-            path,
-            log=config['log'].async(),
-            main_builder=config.get('main_builder')
-        )
-        watcher = self.register_handler(handler, path)
-
-        self.observers_watcher[config.get('main_builder', None)] = (handler, watcher)
-        started += 1
-        config['log'].write('started observer for "%s" on %s' % (self.name, path))
-        return started
-
     def stop_watching(self, log, main_builder=None):
         main_builder = main_builder or self
         for dependency in self.get_dependencies(main_builder):
@@ -272,307 +285,6 @@ class FrontendBuilder(object):
             if not self.observers_watcher:
                 log.write('resetting', self.name)
                 self.reset_observer()
-
-    def watch(self, **config):
-        config['watch'] = True
-        log = config['log']
-        if self.build(**config):
-            return True
-        else:
-            log.write('no observers started, because build failed')
-            return False
-
-    def build(self, **config):
-        """
-        config:
-            storages
-            main_builder
-            log
-            watch
-            skip_db
-            update
-        """
-        if not 'main_builder' in config:
-            config['main_builder'] = self
-        log = config.get('log')
-
-        if not os.path.exists(self.cache_dir_frontend):
-            os.makedirs(self.cache_dir_frontend)
-            
-
-        self.host_root_url = reverse('api:api-root')
-        self.static_content_root_url = '' #  reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
-        self.static_root_url = reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-root')
-        self.static_img_root_url = self.static_root_url + 'img/'
-        self.static_js_root_url = self.static_root_url + 'js/'
-
-        self.clean(**config)
-        #0 init dependencies
-        #dependency_log = log.with_indent("init dependencies")
-        self.init_dependencies(**config)
-
-        #1 collect sources
-        if config.get('update', True):  # or build cache = empty
-            if not os.path.exists(self.cache_dir_remote):
-                os.makedirs(self.cache_dir_remote)
-
-            if not os.path.exists(self.cache_dir_built_css):
-                os.makedirs(self.cache_dir_built_css)
-
-            if not os.path.exists(self.cache_dir_built_js):
-                os.makedirs(self.cache_dir_built_js)
-
-            ## if needed, checkout git
-            self.collect(**config)
-
-        #2 init config file(s)
-        try:
-            self.load_config(**config)
-        except:
-            config.get('log').write('config not loaded')
-            return False
-
-        #if not self.css_sources:
-        #    raise Exception('currently build from cache without update is not possible')
-        #print self.css_sources
-
-        if ((not config.get('skip_db', True)) and config.get('update', True)):
-            self.update_db(**config)
-
-        #3 build
-
-        # copy
-        config['log'] = log.with_indent('copying', single_line=not self.debug)
-        if not self.skip_db or config.get('skip_db', True):
-            self.build_from_cache(**config)
-        else:
-            # load files to DB
-            pass  # self.build_from_db(storages=storages, log=log, main_builder=self)
-
-        # compile
-        config['log'] = log.with_indent('compiling', single_line=not self.debug)
-        if not os.path.exists(self.compile_dir):
-            os.makedirs(self.compile_dir)
-        self.compile(**config)
-
-        # 4 observer
-        if config.get('watch', False):
-            started = self.init_observers(launcher=generate_handler, **config)
-            observer_log = log.with_indent("%s observer started" % started)
-        return True
-
-    def get_config(self, *args, **kwargs):
-        config = self.config
-        default = kwargs.get('default', None)
-
-        for arg in args:
-            if arg in config:
-                config = config.get(arg)
-            else:
-                return default
-        return config
-
-    def clean(self, storages, log=None, **config):
-        if os.path.exists(self.compile_root):
-            shutil.rmtree(self.compile_root)
-        for path in os.listdir(self.cache_dir_src):
-            path = os.path.join(self.cache_dir_src, path)
-            if not os.path.islink(path) and os.path.isdir(path):
-                shutil.rmtree(path)
-
-    def get_frontend_config_dest_path(self):
-        return self.get_config('configuration_file') or ('.' + os.path.sep + 'config.json')
-
-    def get_frontend_config_path(self, folder=False):
-        path = '.' + os.path.sep + 'external_frontend'
-        extension = '.yml'
-
-        if folder:
-            return path + os.path.sep + 'config' + extension
-        return path + extension
-
-    def set_default_config(self, config):
-        self.config = dict_merge(config, self.config)
-
-    def load_data(self, storages, main_builder=None, log=None):
-        raise Exception()
-        log = log.with_indent('loading styles')
-        for root, dirnames, filenames in os.walk(self.src):
-            for path in filenames:
-                path = os.path.join(os.path.relpath(root, self.src), path)
-                if log:
-                    log.write(path)
-                with open(os.path.join(self.src, path), 'r') as content:
-                    self.update(path, content.read(), storages=storages, log=log)
-
-        self.update_configuration(storages, log=log, main_builder=main_builder)
-
-    def collect(self, **config):
-        log = config.get('log', None)
-        for dependency in self.get_dependencies(config.get('main_builder')):
-            dependency.collect(**config)
-        main_builder = config['main_builder']
-        current_cache_dir = self.cache_dir_frontend
-        if not os.path.exists(current_cache_dir):
-            os.mkdir(current_cache_dir)
-
-        # only collect, if its not a link for development stage
-        if not os.path.islink(current_cache_dir):
-            if isinstance(self.src, WrappedSource):
-                self.src.export(current_cache_dir, log=log)
-            else:
-                for root, dirnames, filenames in os.walk(self.src):
-                    relative_path = os.path.relpath(root, self.src)
-                    for path in dirnames:
-                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
-                            continue
-                        path = os.path.join(relative_path, path)
-                        if not os.path.exists(os.path.join(current_cache_dir, path)):
-                            os.mkdir(os.path.join(current_cache_dir, path))
-
-                    for path in filenames:
-                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
-                            continue
-                        path = os.path.join(relative_path, path)
-                        if os.path.exists(os.path.join(current_cache_dir, path)):
-                            os.unlink(os.path.join(current_cache_dir, path))
-                        os.symlink(os.path.join(self.src, path), current_cache_dir + os.path.sep + path)
-
-    def update_db(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
-            dependency.update_db(**config)
-
-        if self.skip_db:
-            return
-        pass
-
-    def load_config(self, **config):
-        current_cache_dir = self.cache_dir_frontend
-        for dependency in self.get_dependencies(config.get('main_builder')):
-            self.config = dict_merge(self.config, dependency.load_config(**config))
-            #main_builder.set_default_config(self.config)
-
-        # load config file
-        if self.type == 'frontend':
-            import yaml
-            try:
-                # loading a simple yaml config file
-                with open(os.path.join(current_cache_dir, self.get_frontend_config_path())) as content:
-                    self.config = dict_merge(self.config, yaml.load(content.read()) or {})
-            except IOError:
-                try:
-                    # processing config folder
-                    with open(os.path.join(current_cache_dir, self.get_frontend_config_path(folder=True))) as content:
-                        self.config = dict_merge(self.config, yaml.load(content.read()) or {})
-                except IOError:
-                    raise
-
-        if self._config:
-            self.config = dict_merge(self.config, self._config)
-
-        # set vars for builder from config
-        self.current_stage = 'debug'  # TODO: get from config
-        self.skip_db = self.config.get('config', {}).get('skipDB', False)
-
-        return self.config
-
-    def build_from_cache(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
-            dependency.build_from_cache(**config)
-
-        log = config.get('log')
-        log = log.with_indent('building ' + self.name)
-        current_source_dir = self.cache_dir_frontend
-        for root, dirnames, filenames in os.walk(current_source_dir):
-            relative_path = os.path.relpath(root, current_source_dir)
-            for path in filenames:
-                if path.startswith('.') or ((os.path.sep + '.') in relative_path):
-                    continue
-                path = os.path.join(relative_path, path)
-                if log:
-                    config['log'] = log.with_indent(path)
-                with open(os.path.join(current_source_dir, path), 'r') as content:
-                    self.update(path, content.read(), build=True, **config)
-
-    def build_from_db(self, storages, log=None, main_builder=None):
-        log = log.with_indent('building')
-        pass #TODO
-
-    def update_configuration(self, **config):
-        if config['main_builder'] is self:
-            # write to storage
-            config['path'] = self.get_frontend_config_dest_path()
-            config['content'] = json.dumps(self.build_frontend_config())  # maybe just update from updated content in **config
-            self.update(**config)
-
-    def build_frontend_config(self, content=None):
-        config = {}
-        for key in ['start', 'frontends', 'requirejs']:
-            config[key] = self.get_config(key) or {}
-        for key in ['debug_level']:
-            config[key] = self.get_config(key)
-
-        config['start']['frontends'] = []
-
-        for app, app_config in self.get_config('apps', default={}).items():
-            prefix = app_config.get('namespace', '')
-            defaults_namespace = self.get_config('requirejs', 'defaults', app, default=prefix)
-            if not isinstance(app_config, dict):
-                app_config = {}
-            apps = {}
-            apps[app] = {
-                'namespace': prefix,
-                'defaults_namespace': defaults_namespace
-            }
-            for dependency in self.dependency_map.values():
-                apps[dependency.name] = {
-                    "namespace": dependency.name,
-                    'defaults_namespace': defaults_namespace
-                }
-
-            host = app_config.get('base_url', self.host_root_url)
-            if app == self.name:
-                config['start']['frontends'].append(app)
-            config['frontends'][app] = {
-                'init': {
-                    'host': host,
-                    'content_host': self.static_content_root_url,
-                    'crossDomain': False
-                },
-                'selector': '[load-' + app+']',
-                'cssConfig': {
-                    'cssUrl': '',
-                    'versions': {},
-                    'themes': {},
-                },
-                'start': {},
-                'appName': app,
-                'appFile': app_config.get('fileName', app),
-                'localesUrl': None,
-                'htmlUrl': None,
-
-                "debug_level": 0,
-                "defaults_namespace": defaults_namespace,
-                "namespace": self.name,
-                "prefix": prefix,
-                "widgets": {
-                    "defaults_namespace": defaults_namespace,
-                    "namespace": self.name,
-                    "prefix": prefix
-                },
-                "apps": apps,
-
-                "css": {
-                    "namespaces": {
-                        "ui": {
-                            "prefix": "ui-"
-                        }
-                    }
-                }
-            }
-
-        config['requirejs']['baseUrl'] = self.static_root_url
-        return config
 
     def generate_build_path(self, orig_path):
         built_root = '.'
@@ -630,6 +342,11 @@ class FrontendBuilder(object):
         if collected is False and self.type == 'lib':
             collected = True
             built_root = libs_path
+            if self.filter:
+                replacement = self.src_name
+                if self.filter.endswith(os.path.sep):
+                    replacement += os.path.sep
+                path = re.compile(self.filter).sub(replacement, path)
 
         # matches by folder name are of higher priority
         if collected is False and (os.path.sep + 'locales' + os.path.sep) in path:
@@ -804,7 +521,7 @@ class FrontendBuilder(object):
             return False
         elif compile_as == 'css-config':
             import scss
-            scss.config.PROJECT_ROOT = self.cache_dir_frontend
+            scss.config.PROJECT_ROOT = self.cache_dir_current
             scss.config.DEBUG = self.debug
             _scss_opts = {
                 'compress': False,
@@ -852,7 +569,7 @@ class FrontendBuilder(object):
             return False  # content
         elif compile_as == 'scss':
             import scss
-            scss.config.PROJECT_ROOT = self.cache_dir_frontend
+            scss.config.PROJECT_ROOT = self.cache_dir_current
             scss.config.DEBUG = self.debug
             _scss_vars = self.css_vars
             _scss_opts = {
@@ -917,7 +634,7 @@ class FrontendBuilder(object):
                     #raise Exception(str((compile_as, new_path, contents)))
                     cur_log.write('no content')
                     continue
-                
+
                 config['log'] = cur_log
                 compile_config = dict(content=content, content_list=content_list, path=path_config['rel_path'], new_path=new_path, **config)
                 content = self.compile_as(compile_as, **compile_config)
@@ -961,3 +678,390 @@ class FrontendBuilder(object):
         """
         config['content'] = None
         return self.update(**config)
+
+    def get_config(self, *args, **kwargs):
+        config = self.config
+        default = kwargs.get('default', None)
+
+        for arg in args:
+            if arg in config:
+                config = config.get(arg)
+            else:
+                return default
+        return config
+
+    def get_frontend_config_dest_path(self):
+        return self.get_config('configuration_file') or ('.' + os.path.sep + 'config.json')
+
+    def get_frontend_config_path(self, folder=False):
+        path = '.' + os.path.sep + 'external_frontend'
+        extension = '.yml'
+
+        if folder:
+            return path + os.path.sep + 'config' + extension
+        return path + extension
+
+    def set_default_config(self, config):
+        self.config = dict_merge(config, self.config)
+
+    def load_data(self, storages, main_builder=None, log=None):
+        raise Exception()
+        log = log.with_indent('loading styles')
+        for root, dirnames, filenames in os.walk(self.src):
+            for path in filenames:
+                path = os.path.join(os.path.relpath(root, self.src), path)
+                if log:
+                    log.write(path)
+                with open(os.path.join(self.src, path), 'r') as content:
+                    self.update(path, content.read(), storages=storages, log=log)
+
+        self.update_configuration(storages, log=log, main_builder=main_builder)
+
+    def load_config(self, **config):
+        current_cache_dir = self.cache_dir_current
+        for dependency in self.get_dependencies(config.get('main_builder')):
+            self.config = dict_merge(self.config, dependency.load_config(**config))
+
+        # load config file
+        if self.type == 'frontend':
+            import yaml
+            try:
+                # loading a simple yaml config file
+                with open(os.path.join(current_cache_dir, self.get_frontend_config_path())) as content:
+                    self.config = dict_merge(self.config, yaml.load(content.read()) or {})
+            except IOError:
+                try:
+                    # processing config folder
+                    with open(os.path.join(current_cache_dir, self.get_frontend_config_path(folder=True))) as content:
+                        self.config = dict_merge(self.config, yaml.load(content.read()) or {})
+                except IOError:
+                    raise
+
+        if self._config:
+            self.config = dict_merge(self.config, self._config)
+
+        # set vars for builder from config
+        self.current_stage = 'debug'  # TODO: get from config
+        self.skip_db = self.config.get('config', {}).get('skipDB', False)
+
+        return self.config
+
+    def update_configuration(self, **config):
+        if config['main_builder'] is self:
+            # write to storage
+            config['path'] = self.get_frontend_config_dest_path()
+            config['content'] = json.dumps(self.build_frontend_config())  # maybe just update from updated content in **config
+            self.update(**config)
+
+    def build_frontend_config(self, content=None):
+        config = {}
+        for key in ['start', 'frontends', 'requirejs']:
+            config[key] = self.get_config(key) or {}
+        for key in ['debug_level']:
+            config[key] = self.get_config(key)
+
+        config['start']['frontends'] = []
+
+        for app, app_config in self.get_config('apps', default={}).items():
+            prefix = app_config.get('namespace', '')
+            defaults_namespace = self.get_config('requirejs', 'defaults', app, default=prefix)
+            if not isinstance(app_config, dict):
+                app_config = {}
+            apps = {}
+            apps[app] = {
+                'namespace': prefix,
+                'defaults_namespace': defaults_namespace
+            }
+            for dependency in self.dependency_map.values():
+                apps[dependency.name] = {
+                    "namespace": dependency.name,
+                    'defaults_namespace': defaults_namespace
+                }
+
+            host = app_config.get('base_url', self.host_root_url)
+            if app == self.name:
+                config['start']['frontends'].append(app)
+            config['frontends'][app] = {
+                'init': {
+                    'host': host,
+                    'content_host': self.static_content_root_url,
+                    'crossDomain': False
+                },
+                'selector': '[load-' + app+']',
+                'cssConfig': {
+                    'cssUrl': '',
+                    'versions': {},
+                    'themes': {},
+                },
+                'start': {},
+                'appName': app,
+                'appFile': app_config.get('fileName', app),
+                'localesUrl': None,
+                'htmlUrl': None,
+
+                "debug_level": 0,
+                "defaults_namespace": defaults_namespace,
+                "namespace": self.name,
+                "prefix": prefix,
+                "widgets": {
+                    "defaults_namespace": defaults_namespace,
+                    "namespace": self.name,
+                    "prefix": prefix
+                },
+                "apps": apps,
+
+                "css": {
+                    "namespaces": {
+                        "ui": {
+                            "prefix": "ui-"
+                        }
+                    }
+                }
+            }
+
+        config['requirejs']['baseUrl'] = self.static_root_url
+        return config
+
+
+class StaticsBuilder(Builder):
+    def __init__(self, settings=None):
+        super(StaticsBuilder, self).__init__(settings)
+        self.found_folders = []
+
+    def get_dependencies(self, main_builder):
+        return []  # THE (only one) Statics Builder never has dependencies
+
+    def init_observers(self, **config):
+        started = 0
+        started += super(StaticsBuilder, self).init_observers(**config)
+
+        main_builder = config.get('main_builder', None)
+
+        if main_builder in self.observers_watcher:
+            return started
+
+        for folder in self.found_folders:
+            self.observe_path(folder, **config)
+            started += 1
+
+        return started
+
+    def collect(self, **config):
+        from django.contrib.staticfiles.finders import get_finders
+        from django.utils.datastructures import SortedDict
+
+        log = config.get('log', None)
+        super(StaticsBuilder, self).collect(**config)
+        main_builder = config['main_builder']
+        current_cache_dir = self.cache_dir_current
+
+        found_files = SortedDict()
+        for finder in get_finders():
+            for path, storage in finder.list([]): # ['CVS', '.*', '*~'] = ignore patterns
+                # Prefix the relative path if the source storage contains it
+                if getattr(storage, 'prefix', None):
+                    prefixed_path = os.path.join(storage.prefix, path)
+                else:
+                    prefixed_path = path
+
+                if prefixed_path not in found_files:
+                    found_files[prefixed_path] = (storage, path)
+                    if self.filter and not re.compile(self.filter).match(path):
+                        continue
+
+                    source = storage.path(path)
+                    new_path = os.path.join(current_cache_dir, path)
+                    log.write('collecting ', path)
+                    source_dir = os.path.dirname(source)
+
+                    if not os.path.exists(os.path.dirname(new_path)):
+                        os.makedirs(os.path.dirname(new_path))
+
+                    if not os.path.exists(new_path):
+                        os.symlink(source, new_path)
+
+                    if (os.path.sep + 'static' + os.path.sep) in source_dir:
+                        while (not source_dir.endswith(os.path.sep + 'static')):
+                            source_dir = os.path.dirname(source_dir)
+                    #found = False
+                    #for folder in self.found_folders:
+                    #    if source_dir in folder:
+                    #        if source_dir == folder
+                    #            found = True
+                    #            break
+                    #        del self.found_folders[self.found_folders.index(folder)]
+                    #        break
+                    if source_dir not in self.found_folders:
+                        self.found_folders.append(source_dir)
+
+
+class FrontendBuilder(Builder):
+    src = None
+    storage = None
+    current_stage = None
+
+    # the source map tells the builder, which files are dependent on which sources
+    source_map = None
+
+    def __init__(self, settings=None):
+        super(FrontendBuilder, self).__init__(settings)
+
+        self.cache_dir_frontend = self.cache_dir_current
+        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote' + os.path.sep + self.name
+        self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + os.path.sep + self.name
+        self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + os.path.sep + self.name
+        self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + os.path.sep + self.name
+        self.compile_dir = self.compile_root + os.path.sep + self.name
+
+        self.init_src(settings.SRC)
+        self.src_real = os.path.realpath(self.src)
+
+        def get_dependencies(main_builder=None):
+            #raise Exception(str(settings.__dict__['_dict']))
+            #raise Exception(str([setting.NAME for setting in settings.DEPENDS_ON]))
+            #raise Exception([str(setting) for setting in settings.DEPENDS_ON])
+            if main_builder is None:
+                return settings.DEPENDS_ON
+            return (entry for entry in settings.DEPENDS_ON if entry != main_builder)
+        self.get_dependencies = get_dependencies
+
+    def init_src(self, source):
+        if source.startswith('git@') or (source.startswith('https://') and '.git' in source):
+            if not os.path.exists(self.cache_dir_remote):
+                os.makedirs(self.cache_dir_remote)
+            self.src = WrappedSource(self.cache_dir_remote, source, wrappedGitMethodMap)
+        else:
+            self.src = source
+
+        if not os.path.exists(self.src):
+            raise Exception('FrontendBuilder need to be initialized with existing src directory.\
+                        "%s" does not exist' % self.src)
+
+    def init_observers(self, **config):
+        started = 0
+        started += super(FrontendBuilder, self).init_observers(**config)
+
+        main_builder = config.get('main_builder', None)
+
+        if main_builder in self.observers_watcher:
+            return started
+
+        path = self.src_real
+        if os.path.islink(self.cache_dir_frontend):
+            path = os.path.realpath(self.cache_dir_frontend)
+        elif isinstance(self.src, WrappedSource):
+            config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
+            return started
+
+        self.observe_path(path, **config)
+        started += 1
+
+        return started
+
+    def build(self, **config):
+        """
+        config:
+            storages
+            main_builder
+            log
+            watch
+            skip_db
+            update
+        """
+        if not 'main_builder' in config:
+            config['main_builder'] = self
+        log = config.get('log')
+
+        if not os.path.exists(self.cache_dir_frontend):
+            os.makedirs(self.cache_dir_frontend)
+
+        self.host_root_url = reverse('api:api-root')
+        self.static_content_root_url = ''  # reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
+        self.static_root_url = reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-root')
+        self.static_img_root_url = self.static_root_url + 'img/'
+        self.static_js_root_url = self.static_root_url + 'js/'
+
+        self.clean(**config)
+        #0 init dependencies
+        #dependency_log = log.with_indent("init dependencies")
+        self.init_dependencies(**config)
+
+        #1 collect sources
+        if config.get('update', True):  # or build cache = empty
+            if not os.path.exists(self.cache_dir_remote):
+                os.makedirs(self.cache_dir_remote)
+
+            if not os.path.exists(self.cache_dir_built_css):
+                os.makedirs(self.cache_dir_built_css)
+
+            if not os.path.exists(self.cache_dir_built_js):
+                os.makedirs(self.cache_dir_built_js)
+
+            ## if needed, checkout git
+            self.collect(**config)
+
+        #2 init config file(s)
+        try:
+            self.load_config(**config)
+        except:
+            raise
+            config.get('log').write('config not loaded')
+            return False
+
+        #if not self.css_sources:
+        #    raise Exception('currently build from cache without update is not possible')
+        #print self.css_sources
+
+        if ((not config.get('skip_db', True)) and config.get('update', True)):
+            self.update_db(**config)
+
+        #3 build
+
+        # copy
+        config['log'] = log.with_indent('copying', single_line=not self.debug)
+        if not self.skip_db or config.get('skip_db', True):
+            self.build_from_cache(**config)
+        else:
+            # load files to DB
+            pass  # self.build_from_db(storages=storages, log=log, main_builder=self)
+
+        # compile
+        config['log'] = log.with_indent('compiling', single_line=not self.debug)
+        if not os.path.exists(self.compile_dir):
+            os.makedirs(self.compile_dir)
+        self.compile(**config)
+
+        # 4 observer
+        if config.get('watch', False):
+            started = self.init_observers(launcher=generate_handler, **config)
+            observer_log = log.with_indent("%s observer started" % started)
+        return True
+
+    def collect(self, **config):
+        log = config.get('log', None)
+        super(FrontendBuilder, self).collect(**config)
+        main_builder = config['main_builder']
+        current_cache_dir = self.cache_dir_frontend
+
+        # only collect, if its not a link for development stage
+        if not os.path.islink(current_cache_dir):
+            if isinstance(self.src, WrappedSource):
+                self.src.export(current_cache_dir, log=log)
+            else:
+                for root, dirnames, filenames in os.walk(self.src):
+                    relative_path = os.path.relpath(root, self.src)
+                    for path in dirnames:
+                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
+                            continue
+                        path = os.path.join(relative_path, path)
+                        if not os.path.exists(os.path.join(current_cache_dir, path)):
+                            os.mkdir(os.path.join(current_cache_dir, path))
+
+                    for path in filenames:
+                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
+                            continue
+                        path = os.path.join(relative_path, path)
+                        if os.path.exists(os.path.join(current_cache_dir, path)):
+                            os.unlink(os.path.join(current_cache_dir, path))
+                        os.symlink(os.path.join(self.src, path), current_cache_dir + os.path.sep + path)
+
