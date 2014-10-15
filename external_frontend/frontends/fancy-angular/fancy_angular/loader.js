@@ -52,6 +52,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                     angularTranslateDirective: 'fancyPlugin!lib:angular/translate/v2/directive/translate',
                     angularTranslateStaticsLoader: 'fancyPlugin!app:fancy-angular:plugins/angular-partial-locales-loader',
                     angular: "fancyPlugin!lib:angular/angular",
+                    cookie: "fancyPlugin!lib:jquery/jquery.cookie",
 
                     appConfig: 'fancyPlugin!app:fancy-angular:config',
                     filters: 'fancyPlugin!app:fancy-angular:filters',
