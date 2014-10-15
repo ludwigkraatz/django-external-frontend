@@ -126,6 +126,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
                         $(element).attr('ng-class', '_ctrlModeActive ? "'+coreApp.config.appName+'-interaction-reveal" : ""');
                         angular.bootstrap(element, [app['name']]);
                         angular.module('config').constant('frontendCore', coreApp);
+                        coreApp.$root_element = element;
                 });
 
                 angular.resumeBootstrap();
@@ -138,7 +139,7 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
         me: null,
         content: null,
 
-        initEndpoints: function(){
+        initEndpoints: function(callback){
 
             settings = this.config;
             this.log('(init)', '[frontendCore]:', this);
@@ -147,8 +148,10 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
             this.endpoint = this.new_ajax({
                 endpoint:   settings.init.host,
                 crossDomain: settings.init.crossDomain,
-                log: this.__log
-            });/*
+                log: this.__log,
+                callback: callback
+            });
+            /*
             this.data = this.new_ajax({
                 endpoint:   settings.init.host,
                 type:       'data',
@@ -209,6 +212,9 @@ define(['fancyPlugin!jquery', 'fancyPlugin!fancyFrontendCore'], function($, core
             $widget.attr('data-' + this.config.prefix + '-widget-name', widget_name); // .slice(widget_name.search('>')+1)
 
             var options = this.get_options($widget[0]);
+            if ($widget[0] == this.$root_element) {
+                this.setScope(scope);
+            }
             options['widgetCore'] = this;
             options['scope'] = scope;
             options['content'] = options['content'] || response;
