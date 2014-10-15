@@ -399,7 +399,7 @@ class Builder(object):
                 else:
                     file_name = '.'.join(file_parts)
                 path = os.path.sep.join((
-                    os.path.sep.join(paths[:-1]),
+                    os.path.sep.join(paths[:-1]) or '.',
                     file_name+os.path.sep+'{version}',
                     paths[-1]
                 ))
@@ -411,6 +411,8 @@ class Builder(object):
         else:
             path = path.replace(self.src_name, self.name)
             path = os.path.join(built_root, path)
+            if path.find(os.path.sep) <= 0:
+                path = '.' + os.path.sep + path
             return path
 
     def get_build_path(self, path):
