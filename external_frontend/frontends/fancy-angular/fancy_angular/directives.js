@@ -584,7 +584,7 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
             // TODO - don't just take the first, get the primary (_resourceList.primary()?)
             if ($scope['__' + name + 'AsPrimary']){
                 //$scope.__defaultWidgetView == 'detail' && $scope.resourceList && $scope.resourceList.length) {
-                $scope.log.debug('display list as the primary element')
+                $scope.log.debug('display list as the primary element', ($scope['__' + name + 'AsNew'] ? 'and as new' : ''), 'of list', $scope[name + 'List'])
                 $scope['__'+ name +'Target'] = 'uuid';
                 if ($scope['__' + name + 'AsNew'] || (!$scope[name + 'List'] || $scope[name +'List'].length == 0)) {
                     $scope['__'+ name +'Id'] = null;
@@ -672,17 +672,21 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                     attr_name = widgetReference.name,
                     attr_obj = widgetReference.obj;
 
-
                 $scope.log.debug('(scope)', 'watching', {
                     name: name,
                     attr_name: attr_name,
                     attr_obj:attr_obj,
                     reference: $scope['__'+name+'Reference']}, 'on parent')
+                
+                if ($scope[name +'List']) {
+                    $scope[name +'List'] = $parentScope[attr_obj][attr_name];
+                }
                 $parentScope.$watch( attr_obj +'.' + attr_name, function() {
                     $scope.log.debug('parents '+attr_obj+'.'+attr_name+' has changed', $parentScope[attr_obj], $parentScope[attr_obj][attr_name]);
                     $scope[name +'List'] = $parentScope[attr_obj][attr_name];
                     $scope._initAttr('!all', {force_update: false});
                 });
+                
                 $parentScope.$watch('__'+attr_obj+'Relationships.' + attr_name, function() {
                     $scope.log.debug('parents __'+attr_obj+'Relationships.'+attr_name+' has changed', $parentScope['__'+attr_obj+'Relationships'], $parentScope['__'+attr_obj+'Relationships'][attr_name]);
                     $scope.updateResource($parentScope['__'+attr_obj+'Relationships'][attr_name]);
