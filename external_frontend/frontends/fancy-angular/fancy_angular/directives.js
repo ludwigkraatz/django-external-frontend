@@ -178,7 +178,7 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
         $compile = $injector.get('$compile'),
         $q = $injector.get('$q');
     
-    
+    $scope.this = $scope.$id;
     $scope.apply = function(rawContent, callback) {
         var content = angular.element(rawContent);
         var compiled = $compile(content);

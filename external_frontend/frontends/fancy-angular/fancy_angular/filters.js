@@ -17,5 +17,10 @@ define([
             return function(input) {
               return frontendConfig.widgets.prefix +'-'+ input;
             };
-        });;
+        })
+        .filter('asID', function() {
+            return function(input) {
+              return input + '-';
+            };
+        });
 });
