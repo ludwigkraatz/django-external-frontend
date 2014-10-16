@@ -113,7 +113,7 @@ config = {
             },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@7c6b3a49f578546a4e7f249899b7a2452d730359',
+                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@73268ea91175983f056da2982477e141f62f72bf',
                 'FILTER': '^fancy-frontend/',
                 'DEPENDS_ON': ['basic-frontend'],
                 'TYPE': 'app',
