@@ -21,7 +21,7 @@ setup(
     name="external-frontend",
     author="Ludwig Kraatz",
     author_email="code@suncircle.de",
-    version='0.1.33',
+    version='0.1.34',
     packages=find_packages(),
     package_data={'external_frontend': ['external_frontend/frontends']},
     include_package_data=True,
