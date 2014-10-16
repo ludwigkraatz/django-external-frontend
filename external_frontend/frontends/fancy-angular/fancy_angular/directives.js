@@ -340,13 +340,14 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     
     $scope.object = function(settings){
         var name = 'resource',
+            attr_obj = 'resource',
             config = settings.config || {},
             asNew = false;
         delete settings.config;
         var provider, fixture;
         $scope.log.debug('getting object', settings, 'fixtures:', $scope.__fixtures);
         
-        if (settings.target == 'uuid' && settings.data === null) {
+        if ((settings.target == 'uuid' && settings.data === null) || $scope['__' + attr_obj + 'AsNew']) {
             asNew = true;
         }
         
@@ -418,15 +419,23 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                 
                 provider = $scope._accessApiEndpoint(initialEndpoint);
                 var endpoint;
+                    //new_provider;
                 while (endpoints.length && (endpoint = endpoints.pop())) {
                     if (!endpoint) continue;
+                    //new_provider = provider;
                     provider = provider.get(endpoint);
                 }
+                //if (asNew) {
+                //    provider = new_provider;
+                //}
             }else{
                 provider = $scope._accessApiEndpoint('object')
             };
         }
         if (asNew) {  // @currentScope.__asObject
+            if (!$scope['__' + attr_obj + 'AsNew']) {
+                $scope['__' + attr_obj + 'AsNew'] = true;
+            }
             result = provider.new(settings)
             $scope.log.debug('(scope)', 'created new', result)
         }else{
@@ -486,10 +495,11 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                     }
                     
                     if ($scope['__'+attr_obj+'Reference'] && !resource.isCreated()) {
+                        var widgetReference = $scope._parseReference($scope['__'+attr_obj+'Reference']),
+                            ref_attr_name = widgetReference.name,
+                            ref_attr_obj = widgetReference.obj;
+                        /*
                         resource.bind('post-create', function(event, result){
-                            var widgetReference = $scope._parseReference($scope['__'+attr_obj+'Reference']),
-                                ref_attr_name = widgetReference.name,
-                                ref_attr_obj = widgetReference.obj;
                             $scope.log.debug('(FancyAngular)', '(Directives)', '(Scope)', '(create)', 'adding', obj, 'to parents', (ref_attr_obj + '.' +ref_attr_name), 'relationship')
                             if ($parentScope['__'+ref_attr_obj+'Relationships'][ref_attr_name] === undefined ) {
                                 $parentScope['_'+ref_attr_obj].get({
@@ -500,7 +510,17 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                             }
                             $parentScope['__'+ref_attr_obj+'Relationships'][ref_attr_name].add(result.obj); // TODO: adding result.obj or obj
                             $parentScope.$apply();
-                        })             
+                        })  */
+                        $scope.log.debug('(FancyAngular)', '(Directives)', '(Scope)', '(create)', 'adding', obj, 'to parents', (ref_attr_obj + '.' +ref_attr_name), 'relationship')
+                            if ($parentScope['__'+ref_attr_obj+'Relationships'][ref_attr_name] === undefined ) {
+                                $parentScope['_'+ref_attr_obj].get({
+                                    target: 'relationship',
+                                    data: ref_attr_name,
+                                    initialContent: $parentScope[ref_attr_obj][ref_attr_name],
+                                    });
+                            }
+                        $parentScope['__'+ref_attr_obj+'Relationships'][ref_attr_name].add(obj);
+                        $parentScope.$apply();
                     }
                 }
             }
@@ -605,6 +625,11 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
     
         $scope._prepareAttr = function(name, initialValue, attrReference, asPrimary){
                 
+            if (!$scope[name + 'Save']){
+                $scope[name + 'Save'] = function(){
+                    if ($scope['_' + name].needsSave())$scope['_' + name].save()
+                }
+            };
             if (!$scope['__' + name + 'Id'] && initialValue){
                 $scope.log.debug('setting default for "' + name +'" to', initialValue)
                 $scope['__' + name + 'Id'] = initialValue
