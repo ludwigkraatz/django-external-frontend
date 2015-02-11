@@ -483,6 +483,11 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                     var old = $scope['_resourceList'];                             
                     $scope['_resourceList'] = resource;
                     old.replaceWith(resource);
+                    if ($scope['__' + attr_obj + 'AsPrimary']) {
+                        $scope._initAttr(attr_obj, {force_update: false});
+                    }else{
+                        $scope[attr_obj] = $parentScope[attr_obj]
+                    }
                 }
             }else{
                 if ($scope['_resource'] !== resource) {
@@ -791,6 +796,10 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                         $scope.__defaultWidgetView = value;
                     }
                 }else{
+                    if ($parentScope[key]) {
+                        $scope[key + 'Parent'] = $parentScope[key];
+                    }
+                    
                     if (value.hasOwnProperty('asPrimary')) {
                         $scope['__'+ key + 'AsPrimary'] = value['asPrimary'];
                     }
@@ -812,7 +821,6 @@ function prepareController($injector, $scope, $parentScope, jsConfig, widgetConf
                 }
             }
                 
-            
         }
     }
 } // ', ['$scope', '$translate', '$translatePartialLoader', function
