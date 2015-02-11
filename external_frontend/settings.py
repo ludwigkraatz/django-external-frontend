@@ -62,7 +62,7 @@ config = {
         'STATICS_OVER_API': django_settings.DEBUG,
         # unwrapped getter: app_settings.init.get_instance
         '_INIT_METHOD': 'app_settings.init.get_wrapped_instance',
-        'API_FRONTEND_PREFIX': 'frontend.',
+        'API_FRONTEND_PREFIX': 'frontend',
         'FILES_FRONTEND_POSTFIX': django_settings.DEBUG,
 
         'FRONTEND': {

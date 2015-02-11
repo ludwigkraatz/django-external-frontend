@@ -5,13 +5,14 @@ from introspective_api.views import EndpointView
 
 default_frontend_endpoint = None
 frontends = {}
+app_name = settings.API_FRONTEND_PREFIX
 
 def get_default_endpoint(name):
     global default_frontend_endpoint, frontends
     if default_frontend_endpoint is None:
         default_frontend_endpoint = api_root.register_endpoint('frontend', active=True)
 
-    return default_frontend_endpoint.register_endpoint(name, namespace=settings.API_FRONTEND_PREFIX+name)
+    return default_frontend_endpoint.register_endpoint(name, namespace=name, app_name=app_name)
 
 if settings.STATICS_OVER_API:
     for name, frontend in settings.FRONTEND_COLLECTION.items():
