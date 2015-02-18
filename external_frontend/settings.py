@@ -121,8 +121,9 @@ config = {
             },
             'fancy-angular': {
                 'NAME': 'fancy-angular',
-                'SRC_NAME': 'fancy_angular',
-                'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'fancy-angular'),
+                #'FILTER': '^fancy-angular/',
+                #'SRC_NAME': 'fancy_angular',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },
