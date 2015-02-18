@@ -165,7 +165,9 @@ function prepareWidgetConfig(widgetConfig){
     // TODO: NamespaceProvider.lookup(scope, widgetConfig);
     widgetConfig.widgetNamespace = parts.length > 1 ? parts[0] : frontendConfig.widgets.namespace;
     widgetConfig.widgetName = parts.length > 1 ? parts[1] : parts[0];
-    widgetConfig.widgetSource = widgetConfig.widgetNamespace + ':' + widgetConfig.widgetName;
+    // the source is formatted like this: widgetNamespace:widgetFileName
+    // if the widgetName containts '__' this means, its in the file  the string before '__' defines. this is like a "local/private" subwidget
+    widgetConfig.widgetSource = widgetConfig.widgetNamespace + ':' + (widgetConfig.widgetName.split('__')[0]);
     widgetConfig.widgetData = widgetConfig.widgetResource = widgetConfig.widgetState ?
         widgetConfig.widgetState['.']['resource']['uuid'] : null;
     widgetConfig.widgetView = widgetConfig.widgetState ?
