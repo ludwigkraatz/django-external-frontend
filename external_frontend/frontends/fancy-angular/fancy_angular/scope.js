@@ -224,7 +224,7 @@ define(['fancyPlugin!angular', 'fancyPlugin!fancyWidgetCore'], function (angular
                 }
             }
             
-            if (settings.target == 'relationship') {
+            if (settings.target == 'relationship' && settings.data !== null) {
                 settings['initialContent'] = config.objList_json;
                 if (!config.parentObj) {
                     return undefined // wait until parent has loaded
@@ -264,14 +264,18 @@ define(['fancyPlugin!angular', 'fancyPlugin!fancyWidgetCore'], function (angular
                     provider = $scope._accessApiEndpoint('object')
                 };
             }
-            if (asNew) {  // @currentScope.__asObject
-                if (!$scope['__' + attr_obj + 'AsNew']) {
-                    $scope['__' + attr_obj + 'AsNew'] = true;
-                }
-                result = provider.new(settings)
-                $scope.log.debug('(scope)', 'created new', result)
+            if (settings.data === null) {
+                result = provider;
             }else{
-                result = provider.get(settings) 
+                if (asNew) {  // @currentScope.__asObject
+                    if (!$scope['__' + attr_obj + 'AsNew']) {
+                        $scope['__' + attr_obj + 'AsNew'] = true;
+                    }
+                    result = provider.new(settings)
+                    $scope.log.debug('(scope)', 'created new', result)
+                }else{
+                    result = provider.get(settings) 
+                }
             }
             
             $scope._initAttrBindings(result);
