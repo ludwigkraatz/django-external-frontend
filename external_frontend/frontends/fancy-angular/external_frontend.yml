@@ -5,6 +5,7 @@ requirejs:
         "fancyFrontendConfig": "fancyPlugin!app:fancy-frontend:config"
         "fancyFrontendConfiguration": "fancyPlugin!app:fancy-frontend:configuration"
         "fancyFrontendCore": "fancyPlugin!app:fancy-frontend:frontend"
+        "fancyScopeCore": "fancyPlugin!app:fancy-angular:scope"
         "fancyWidgetCore": "fancyPlugin!app:fancy-angular:widgets"
         "fancyWidgetMixins": "fancyPlugin!app:fancy-frontend:widgetMixins"
         "fancyWidgetViews": "fancyPlugin!app:fancy-frontend:widgetViews"
