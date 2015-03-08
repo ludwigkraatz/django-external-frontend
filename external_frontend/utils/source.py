@@ -14,7 +14,7 @@ class WrappedSource(str):
         return super(WrappedSource, self).__new__(self, args[0])
 
     def __init__(self, cache, source, method_map=None):
-        super(WrappedSource, self).__init__(source)
+        super(WrappedSource, self).__init__()
         self.source = source
         self.cache = cache
         self.handler = None
