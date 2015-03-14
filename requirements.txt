@@ -1,5 +1,5 @@
 -e git+git://github.com/ludwigkraatz/django-app-settings.git@3b10f9753b52100f09db15b8878aa42b76a4d71e#egg=app-settings-0.1.11
--e git+git://github.com/ludwigkraatz/django-introspective-api.git@85145e7e483ce9e702a997cd12eef93ae30e4a34#egg=introspective-api-0.1.17
+-e git+git://github.com/ludwigkraatz/django-introspective-api.git@6a4feb333f6946170ee2488eed0969be73d1d972#egg=introspective-api-0.1.18
 watchdog==0.7.1
 PyYaml==3.11
 django-pipeline==1.3.24

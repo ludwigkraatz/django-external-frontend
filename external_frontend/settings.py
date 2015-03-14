@@ -123,7 +123,7 @@ config = {
                 'NAME': 'fancy-angular',
                 #'FILTER': '^fancy-angular/',
                 #'SRC_NAME': 'fancy_angular',
-                'SRC': 'https://github.com/suncircle/fancy-angular.git',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git@09c695544130187944e87c20bf88356ef8371881',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },
