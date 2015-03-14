@@ -14,6 +14,10 @@ class WrappedSource(str):
         if isinstance(args[0], WrappedSource):
             return args[0]
 
+        # the second arg would usually be the real source
+        if len(args) > 10:
+            return super(WrappedSource, self).__new__(self, args[1])
+
         # fallback to first arg
         return super(WrappedSource, self).__new__(self, args[0])
 
@@ -79,7 +83,11 @@ class WrappedSource(str):
 
             if branch:
                 repo.git.checkout(branch)  # TODO: is this the right/best way?
-                repo.remotes.origin.pull(branch)
+                try:
+                    repo.remotes.origin.pull(branch)
+                except AssertionError, e:
+                    if '[up up date]' not in str(e):
+                        raise
 
         if commit:  # TODO: this is not always working? maybe always checkout branch first?
             if log:
