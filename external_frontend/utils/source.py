@@ -11,6 +11,10 @@ wrappedGitMethodMap = {
 
 class WrappedSource(str):
     def __new__(self, *args, **kwargs):
+        if isinstance(args[0], WrappedSource):
+            return args[0]
+
+        # fallback to first arg
         return super(WrappedSource, self).__new__(self, args[0])
 
     def __init__(self, cache, source, method_map=None):
