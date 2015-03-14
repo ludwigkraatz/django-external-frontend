@@ -86,7 +86,7 @@ class WrappedSource(str):
                 try:
                     repo.remotes.origin.pull(branch)
                 except AssertionError, e:
-                    if '[up up date]' not in str(e):
+                    if '[up to date]' not in str(e):
                         raise
 
         if commit:  # TODO: this is not always working? maybe always checkout branch first?
