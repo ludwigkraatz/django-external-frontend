@@ -11,6 +11,7 @@ from ..settings import settings as externalFrontendSettings
 import re
 from django.utils.datastructures import SortedDict
 from django.core.urlresolvers import reverse
+from django.conf import settings
 from introspective_api.reverse import reverse_nested
 
 from ..utils.source import WrappedSource, wrappedGitMethodMap
@@ -916,7 +917,10 @@ class FrontendBuilder(Builder):
 
         self.host_root_url = reverse('api:api-root')# TODO:?, current_app=self.name)
         self.static_content_root_url = ''  # reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
-        self.static_root_url = reverse_nested('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+':static-root', current_app=self.name)
+        if externalFrontendSettings.STATICS_OVER_API:
+            self.static_root_url = reverse_nested('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+':static-root', current_app=self.name)
+        else:
+            self.static_root_url = settings.STATIC_URL
         self.static_img_root_url = self.static_root_url + 'img/'
         self.static_js_root_url = self.static_root_url + 'js/'
 
