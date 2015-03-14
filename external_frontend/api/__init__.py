@@ -1,5 +1,5 @@
 from ..settings import settings
-from ..server import StaticsServer
+from ..server.api_endpoint import StaticsServer
 from introspective_api.endpoints import api_root, ImproperlyConfigured
 from introspective_api.views import EndpointView
 
