@@ -61,8 +61,8 @@ class FileStorage(Storage):
         self.root = settings.ROOT
 
         if not os.path.exists(self.root):
-            if os.path.exists(os.path.sep.join(self.root.split(os.path.sep)[:-1])):
-                os.mkdir(self.root)
+            if True:  # TODO: some more security?: os.path.exists(os.path.sep.join(self.root.split(os.path.sep)[:-1])):
+                os.makedirs(self.root)
             else:
                 raise Exception('FileStorage view need to be initialized with existing root directory. \
                                 "%s" does not exist' % self.root)
