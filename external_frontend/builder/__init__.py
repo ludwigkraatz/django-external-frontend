@@ -78,6 +78,8 @@ class Builder(object):
         self.filter = settings.FILTER
 
         self.cache_dir = (externalFrontendSettings.CACHE_ROOT + os.path.sep + 'external_frontend.cache')
+        if not os.path.isabs(self.cache_dir):
+            self.cache_dir = os.path.abspath(self.cache_dir)
         self.cache_dir_src = self.cache_dir + os.path.sep + 'src'
         self.compile_root = self.cache_dir + os.path.sep + 'compiled'
 
@@ -138,6 +140,8 @@ class Builder(object):
         current_source_dir = self.cache_dir_current
         for root, dirnames, filenames in os.walk(current_source_dir):
             relative_path = os.path.relpath(root, current_source_dir)
+            if relative_path.startswith('.') and not len(relative_path) == 1:
+                continue
             for path in filenames:
                 if path.startswith('.') or ((os.path.sep + '.') in relative_path):
                     continue
@@ -647,12 +651,12 @@ class Builder(object):
     def load_data(self, storages, main_builder=None, log=None):
         raise Exception()
         log = log.with_indent('loading styles')
-        for root, dirnames, filenames in os.walk(self.src):
+        for root, dirnames, filenames in os.walk(self.src.cache):
             for path in filenames:
-                path = os.path.join(os.path.relpath(root, self.src), path)
+                path = os.path.join(os.path.relpath(root, self.src.cache), path)
                 if log:
                     log.write(path)
-                with open(os.path.join(self.src, path), 'r') as content:
+                with open(os.path.join(self.src.cache, path), 'r') as content:
                     self.update(path, content.read(), storages=storages, log=log)
 
         self.update_configuration(storages, log=log, main_builder=main_builder)
@@ -847,14 +851,14 @@ class FrontendBuilder(Builder):
         super(FrontendBuilder, self).__init__(settings)
 
         self.cache_dir_frontend = self.cache_dir_current
-        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote' + os.path.sep + self.name
+        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote'
         self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + os.path.sep + self.name
         self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + os.path.sep + self.name
         self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + os.path.sep + self.name
         self.compile_dir = self.compile_root + os.path.sep + self.name
 
         self.init_src(settings.SRC)
-        self.src_real = os.path.realpath(self.src)
+        self.src_real = os.path.realpath(self.src.cache)
 
         def get_dependencies(main_builder=None):
             #raise Exception(str(settings.__dict__['_dict']))
@@ -866,16 +870,11 @@ class FrontendBuilder(Builder):
         self.get_dependencies = get_dependencies
 
     def init_src(self, source):
-        if source.startswith('git@') or (source.startswith('https://') and '.git' in source):
-            if not os.path.exists(self.cache_dir_remote):
-                os.makedirs(self.cache_dir_remote)
-            self.src = WrappedSource(self.cache_dir_remote, source, wrappedGitMethodMap)
-        else:
-            self.src = source
+        self.src = WrappedSource(source, version_cache=self.cache_dir_remote)
 
-        if not os.path.exists(self.src):
+        if not os.path.exists(self.src.cache):
             raise Exception('FrontendBuilder need to be initialized with existing src directory.\
-                        "%s" does not exist' % self.src)
+                        "%s" does not exist' % self.src.cache)
 
     def init_observers(self, **config):
         started = 0
@@ -889,7 +888,7 @@ class FrontendBuilder(Builder):
         path = self.src_real
         if os.path.islink(self.cache_dir_frontend):
             path = os.path.realpath(self.cache_dir_frontend)
-        elif isinstance(self.src, WrappedSource):
+        elif self.src.source_type != 'folder':
             config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
             return started
 
@@ -931,9 +930,6 @@ class FrontendBuilder(Builder):
 
         #1 collect sources
         if config.get('update', True):  # or build cache = empty
-            if not os.path.exists(self.cache_dir_remote):
-                os.makedirs(self.cache_dir_remote)
-
             if not os.path.exists(self.cache_dir_built_css):
                 os.makedirs(self.cache_dir_built_css)
 
@@ -988,23 +984,5 @@ class FrontendBuilder(Builder):
 
         # only collect, if its not a link for development stage
         if not os.path.islink(current_cache_dir):
-            if isinstance(self.src, WrappedSource):
-                self.src.export(current_cache_dir, log=log)
-            else:
-                for root, dirnames, filenames in os.walk(self.src):
-                    relative_path = os.path.relpath(root, self.src)
-                    for path in dirnames:
-                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
-                            continue
-                        path = os.path.join(relative_path, path)
-                        if not os.path.exists(os.path.join(current_cache_dir, path)):
-                            os.mkdir(os.path.join(current_cache_dir, path))
-
-                    for path in filenames:
-                        if path.startswith('.') or (os.path.sep + '.') in relative_path:
-                            continue
-                        path = os.path.join(relative_path, path)
-                        if os.path.exists(os.path.join(current_cache_dir, path)):
-                            os.unlink(os.path.join(current_cache_dir, path))
-                        os.symlink(os.path.join(self.src, path), current_cache_dir + os.path.sep + path)
+            self.src.export(current_cache_dir, log=log)
 
