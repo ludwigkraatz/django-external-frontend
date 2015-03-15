@@ -888,7 +888,9 @@ class FrontendBuilder(Builder):
         path = self.src_real
         if os.path.islink(self.cache_dir_frontend):
             path = os.path.realpath(self.cache_dir_frontend)
-        elif self.src.source_type != 'folder':
+        elif self.src.source_type == 'folder':
+            path = self.src.source
+        else:
             config['log'].write('skip starting observer for "%s" on %s, because its wrapped' % (self.name, self.src_real))
             return started
 

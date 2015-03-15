@@ -22,12 +22,13 @@ config = {
         'FRONTEND': {
             'NAME': None,
             'PREFIX': None,  # used as root folder in storage as well as in statics server name
-            'STORAGE': None,
-            'USED_STORAGE': [],
             #'STORAGE_METHOD': None,
             'WORDING_HANDLER': None,
             'ENDPOINT': None,
-            'BUILDER': []
+            'BUILDER': None,
+            'PLATFORM': None,
+            'SUPPORTED_PLATFORMS': [],
+            'API_SERVED_STORAGE': None,
         },
         'FRONTEND_COLLECTION': {},
         'WORDING_HANDLER': {
@@ -48,6 +49,12 @@ config = {
         #   'CERT': ''
         },
         'BUILDER_COLLECTION': {},
+        'PLATFORM': {
+            'NAME': None,
+            'STORAGE': None,
+            'USED_STORAGE': [],
+        },
+        'PLATFORM_COLLECTION': {},
         'STORAGE': {
             'NAME': None,
             'ROOT': None,
@@ -67,10 +74,10 @@ config = {
 
         'FRONTEND': {
             'NAME': 'default',
-            'STORAGE': 'default',
             'WORDING_HANDLER': 'default',
             'ENDPOINT': '',
-            'BUILDER': 'default',
+            'PLATFORM': 'web',
+            'API_SERVED_STORAGE': 'default'
         },
         'WORDINGS': {
             'NAME': 'default',
@@ -141,6 +148,15 @@ config = {
                     }
                 }
             }
+        },
+        'PLATFORM': {
+            'NAME': 'default',
+            'STORAGE': 'default',
+        },
+        'PLATFORM_COLLECTION': {
+            'web': {
+                'NAME': 'web'
+            }
         }
     },
 
@@ -156,14 +172,18 @@ config = {
         'FRONTEND': 'FRONTEND_COLLECTION|NAME',
         'STORAGE': 'STORAGE_COLLECTION|NAME',
         'BUILDER': 'BUILDER_COLLECTION|NAME',
+        'PLATFORM': 'PLATFORM_COLLECTION|NAME',
         'WORDING_HANDLER': 'WORDING_HANDLER_COLLECTION|NAME',
-        'FRONTEND.STORAGE': 'FRONTEND.USED_STORAGE',
+        'PLATFORM.STORAGE': 'PLATFORM.USED_STORAGE',
+        'FRONTEND.PLATFORM': 'FRONTEND.SUPPORTED_PLATFORMS',
     },
 
     'LINK': {
-        'FRONTEND.STORAGE': 'STORAGE_COLLECTION',
+        'PLATFORM.STORAGE': 'STORAGE_COLLECTION',
         'FRONTEND.BUILDER': 'BUILDER_COLLECTION',
-        'BUILDER.DEPENDS_ON': 'BUILDER_COLLECTION'
+        'BUILDER.DEPENDS_ON': 'BUILDER_COLLECTION',
+        'FRONTEND.PLATFORM': 'PLATFORM_COLLECTION',
+        'FRONTEND.API_SERVED_STORAGE': 'STORAGE_COLLECTION'
     },
 
     'INIT': [

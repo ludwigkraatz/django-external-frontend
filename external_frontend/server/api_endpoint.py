@@ -25,7 +25,7 @@ class StaticsServer(RetrieveAPIView):
         import os
         super(StaticsServer, self).__init__(*args, **kwargs)
         try:
-            self.storages = self.get_config()['frontend'].USED_STORAGE
+            self.storages = [self.get_config()['frontend'].API_SERVED_STORAGE]
         except KeyError:
             raise
             raise Exception('StaticsServer view needs to be initialized with "frontend" defined in view_config\
