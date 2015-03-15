@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 from pip.req import parse_requirements
+import os
 
 requirements = []
 dependencies = []
@@ -17,13 +18,29 @@ for requirement in parse_requirements('requirements.txt'):
         requirements.append(str(requirement.req))
 
 
+def get_package_data(package):
+    """
+    Return all files under the root package, that are not in a
+    package themselves.
+    """
+    walk = [(dirpath.replace(package + os.sep, '', 1), filenames)
+            for dirpath, dirnames, filenames in os.walk(package)
+            if not os.path.exists(os.path.join(dirpath, '__init__.py'))]
+
+    filepaths = []
+    for base, filenames in walk:
+        filepaths.extend([os.path.join(base, filename)
+                          for filename in filenames])
+    return {package: filepaths}
+
+
 setup(
     name="external-frontend",
     author="Ludwig Kraatz",
     author_email="code@suncircle.de",
-    version='0.1.41',
+    version='0.1.42',
     packages=find_packages(),
-    package_data={'external_frontend': ['external_frontend/frontends']},
+    package_data=get_package_data('external_frontend'),
     include_package_data=True,
     install_requires=requirements,
     dependency_links=dependencies
