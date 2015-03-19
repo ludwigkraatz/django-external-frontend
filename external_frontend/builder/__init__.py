@@ -143,21 +143,28 @@ class Builder(object):
             if relative_path.startswith('.') and not len(relative_path) == 1:
                 continue
             for path in filenames:
+                is_used = self.uses_source(path)
                 if path.startswith('.') or ((os.path.sep + '.') in relative_path):
                     continue
                 path = os.path.join(relative_path, path)
                 if log:
-                    config['log'] = log.with_indent(path)
-                with open(os.path.join(current_source_dir, path), 'r') as content:
-                    self.update(path, content.read(), build=True, **config)
+                    config['log'] = log.with_indent(path, logging_level=log.INFO_LOG if is_used else log.DEBUG_LOG)
+
+                if is_used:
+                    with open(os.path.join(current_source_dir, path), 'r') as content:
+                        self.update(path, content.read(), build=True, **config)
+                else:
+                    config['log'].write('not used')
 
     def build_from_db(self, **config):
         for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.build_from_db(**config)
+        # TODO
 
     def update_db(self, **config):
         for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.update_db(**config)
+        # TODO
 
     def init_dependencies(self, **config):
         main_builder = config.get('main_builder')
@@ -227,6 +234,9 @@ class Builder(object):
             if not self.observers_watcher:
                 log.write('resetting', self.name)
                 self.reset_observer()
+
+    def uses_source(self, path):
+        return self.get_build_path(path) is not None
 
     def generate_build_path(self, orig_path):
         built_root = '.'
