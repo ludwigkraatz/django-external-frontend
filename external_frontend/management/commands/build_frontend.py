@@ -1,4 +1,4 @@
-from ...settings import settings
+from ...settings import settings, InvalidSettingError
 from django.core.management.base import BaseCommand, CommandError
 #from ...utils.watch import watch_folder, watch_git
 from ...builder import FrontendBuilder
@@ -72,7 +72,12 @@ class Command(BaseCommand):
         for name, frontend in settings.FRONTEND_COLLECTION.items():
             if selected_frontend != 'all' and frontend.NAME != selected_frontend:
                 continue
-            if not frontend.BUILDER:
+            try:
+                if not frontend.BUILDER:
+                    build_log.error('wont build "%s" becuase has no builder defined' % name)
+                    continue
+            except InvalidSettingError:
+                build_log.error('wont build "%s" becuase has no builder defined' % name)
                 continue
 
             for platform in frontend.SUPPORTED_PLATFORMS:

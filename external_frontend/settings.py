@@ -1,4 +1,5 @@
 from app_settings import app_settings
+from app_settings.exceptions import InvalidSettingError
 from django.conf import settings as django_settings
 import os
 
