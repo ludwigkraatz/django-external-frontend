@@ -275,6 +275,7 @@ class Builder(object):
 
         if path == self.get_frontend_config_dest_path():
             unversioned = True
+            ignore = False  # TODO: why is this needed? does filter exclude root dir file?
 
         if self.get_config('staging', 'configurations'):
             for configuration, config in self.get_config('staging', 'configurations').items():
