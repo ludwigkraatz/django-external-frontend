@@ -76,6 +76,7 @@ class Builder(object):
         self.debug = settings.DEBUG
         self.type = settings.TYPE
         self.filter = settings.FILTER
+        self.exclude = settings.EXCLUDE
 
         self.cache_dir = (externalFrontendSettings.CACHE_ROOT + os.path.sep + 'external_frontend.cache')
         if not os.path.isabs(self.cache_dir):
@@ -143,10 +144,10 @@ class Builder(object):
             if relative_path.startswith('.') and not len(relative_path) == 1:
                 continue
             for path in filenames:
-                is_used = self.uses_source(path)
                 if path.startswith('.') or ((os.path.sep + '.') in relative_path):
                     continue
                 path = os.path.join(relative_path, path)
+                is_used = self.uses_source(path)
                 if log:
                     config['log'] = log.with_indent(path, logging_level=log.INFO_LOG if is_used else log.DEBUG_LOG)
 
@@ -236,7 +237,13 @@ class Builder(object):
                 self.reset_observer()
 
     def uses_source(self, path):
-        return self.get_build_path(path) is not None
+        used = False
+
+        used = used or self.get_build_path(path) is not None
+        used = used or self.is_css_config_path(path)
+        used = used or self.is_frontend_config_path(path)
+        used = used or (self.is_css_lib_path(path) and not self.is_excluded(path))
+        return used
 
     def generate_build_path(self, orig_path):
         built_root = '.'
@@ -246,6 +253,9 @@ class Builder(object):
         unversioned = None
 
         if self.filter and not re.compile(self.filter).match(path):
+            ignore = True
+
+        if not ignore and self.is_excluded(path):
             ignore = True
 
         for expr, replacement in (self.get_config('rename', default={}) or {}).iteritems():  # TODO: why is ehere "or {}" needed.. there is a bug in default={}..
@@ -376,6 +386,28 @@ class Builder(object):
 
         return self.source_map[path]
 
+    def is_excluded(self, path):
+        ignore = False
+
+        if not ignore and self.exclude and re.compile(self.exclude).match(path):
+            ignore = True
+
+        return ignore
+
+    def is_frontend_config_path(self, path):
+        return path == self.get_frontend_config_path()
+
+    def is_css_config_path(self, path):
+        return (
+            path.startswith('./' + self.name + '/css/') or
+            path.startswith(self.name + '/css/')
+        ) and path.split('.')[-1] in ['scss', 'sass', 'css'] and not path.endswith(os.path.sep + 'core.scss')
+
+    def is_css_lib_path(self, path, new_path=None):
+        return path.endswith('.sass') or path.endswith('.scss') or (
+                new_path and (new_path.endswith('.sass') or new_path.endswith('.scss'))
+            )
+
     def update(self, path, content, **config):
         """
         updates changed sources
@@ -388,19 +420,17 @@ class Builder(object):
         new_path = config['new_path']
 
         compile_as = None
-        if path == self.get_frontend_config_path():
+        if self.is_frontend_config_path(path):
             compile_as = 'config'
             config['new_path'] = 'config.json'  # todo self.js_config_dest
             config['rel_path'] = None
-        elif (path.startswith('./' + self.name + '/css/') or path.startswith(self.name + '/css/')) and path.split('.')[-1] in ['scss', 'sass', 'css'] and not path.endswith(os.path.sep + 'core.scss'):
+        elif self.is_css_config_path(path):
             compile_as = 'css-config'
             config['rel_path'] = config['path'].replace(self.name + '/css/', self.name + '/')
             config['new_path'] = 'core.css'
-        elif path.endswith('.sass') or path.endswith('.scss') or (
-                new_path and (new_path.endswith('.sass') or new_path.endswith('.scss'))
-            ):
+        elif self.is_css_lib_path(path, new_path):
             compile_as = 'scss'
-            config['new_path'] = new_path.replace('.scss', '.css').replace('.sass', '.css')
+            config['new_path'] = new_path.replace('.scss', '.css').replace('.sass', '.css') if new_path else new_path
             config['rel_path'] = config['path'].replace(self.name + '/widgets/', self.name + '/').replace('/css/', '/')
 
         if compile_as is not None:

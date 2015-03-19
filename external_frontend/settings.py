@@ -43,6 +43,7 @@ config = {
             'SRC': None,
             'DEPENDS_ON': [],
             'FILTER': None,
+            'EXCLUDE': None,
             'TYPE': None,  # lib, app, widget, css, img, partial
             'VERSION': None,
             'CONFIG': None
@@ -95,6 +96,7 @@ config = {
             'DEPENDS_ON': [],
             'TYPE': 'frontend',
             'FILTER': '',
+            'EXCLUDE': '',
             'CONFIG': {}  # TODO: is it safe to use {} here?
         },
         'BUILDER_COLLECTION': {
