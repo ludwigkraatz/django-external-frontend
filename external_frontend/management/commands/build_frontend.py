@@ -27,21 +27,26 @@ class Command(BaseCommand):
                     dest='frontend',
                     default=None,
                     help='which specific plattform shall be built'),
+        make_option('--dry-run',
+                    action='store_true',
+                    dest='dry',
+                    default=False,
+                    help='just output what would have been done'),
     )
 
-    def build_platform(self, frontend, platform, log, watch=False):
+    def build_platform(self, frontend, platform, log, watch=False, dry=None):
         main_builder = frontend.BUILDER
         for storage in platform.USED_STORAGE:
             storage.build(frontend, log=log)  # collecting statics
 
-        frontend_stdout = log.with_indent('Frontend: "%s"' % frontend.NAME)
+        frontend_stdout = log.with_indent('Frontend: "%s":"%s"' % (frontend.NAME, platform.NAME))
 
         frontend_stdout.write('starting builder "%s"' % main_builder, 'and watch for changes' if watch else '')
         if watch:
-            if not main_builder.watch(platform=platform, storages=platform.USED_STORAGE, log=frontend_stdout):
+            if not main_builder.watch(platform=platform, storages=platform.USED_STORAGE, log=frontend_stdout, dry=dry):
                 frontend_stdout.write('builder "%s" couldnt start' % main_builder.NAME)
         else:
-            if not main_builder.build(platform=platform, storages=platform.USED_STORAGE, log=frontend_stdout):
+            if not main_builder.build(platform=platform, storages=platform.USED_STORAGE, log=frontend_stdout, dry=dry):
                 frontend_stdout.write('builder "%s" couldnt succeed' % main_builder.NAME)
 
     def prepare_storages(self, log):
@@ -80,11 +85,11 @@ class Command(BaseCommand):
                 build_log.error('wont build "%s" becuase has no builder defined' % name)
                 continue
 
-            for platform in frontend.SUPPORTED_PLATFORMS:
+            for platform in frontend.PLATFORMS:
                 if selected_platform != 'all' and platform.NAME != selected_platform:
                     continue
 
-                self.build_platform(frontend, platform, log=build_log, watch=options['watch'])
+                self.build_platform(frontend, platform, log=build_log, watch=options['watch'], dry=options['dry'])
                 started.append((frontend, platform))
 
         if len(started) == 0:

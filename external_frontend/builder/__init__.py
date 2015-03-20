@@ -77,14 +77,17 @@ class Builder(object):
         self.type = settings.TYPE
         self.filter = settings.FILTER
         self.exclude = settings.EXCLUDE
+        self.supported_platforms = settings.SUPPORTED_PLATFORMS
 
-        self.cache_dir = (externalFrontendSettings.CACHE_ROOT + os.path.sep + 'external_frontend.cache')
-        if not os.path.isabs(self.cache_dir):
-            self.cache_dir = os.path.abspath(self.cache_dir)
-        self.cache_dir_src = self.cache_dir + os.path.sep + 'src'
-        self.compile_root = self.cache_dir + os.path.sep + 'compiled'
+        settings_cache_root = externalFrontendSettings.CACHE_ROOT
+        if not os.path.isabs(settings_cache_root):
+            settings_cache_root = settings_cache_root
+        self.cache_root = settings_cache_root + os.path.sep + 'external_frontend.cache'
+        self.remote_root = settings_cache_root + os.path.sep + 'external_frontend.remote'
 
-        self.cache_dir_current = self.cache_dir_src + os.path.sep + self.name
+        current_remote_dir = self.get_remote_dir()
+        if not os.path.exists(current_remote_dir):
+            os.makedirs(current_remote_dir)
 
         self.reset_observer()
         self.dependency_map = {}
@@ -116,11 +119,33 @@ class Builder(object):
         }
         self.css_sources = SortedDict()
 
+    def get_cache_dir(self, **config):
+        return self.cache_root + os.path.sep + self.name + os.path.sep + config['platform'].NAME
+
+    def get_cache_dir_src(self, **config):
+        return self.get_cache_dir(**config) + os.path.sep + 'src'
+
+    def get_compile_dir(self, **config):
+        return self.get_cache_dir(**config) + os.path.sep + 'compiled'
+
+    def get_cache_dir_current(self, **config):
+        return self.get_cache_dir_src(**config)
+
+    def get_remote_dir(self, ):
+        return self.remote_root
+
+    def get_cache_dir_build(self, dir_type=None, **config):
+        return self.get_cache_dir(**config) + os.path.sep+ 'build' + (
+            '' if dir_type is None else (os.path.sep + dir_type)
+        )
+
     def clean(self, storages, log=None, **config):
-        if os.path.exists(self.compile_root):
-            shutil.rmtree(self.compile_root)
-        for path in os.listdir(self.cache_dir_src):
-            path = os.path.join(self.cache_dir_src, path)
+        compile_root = self.get_compile_dir(**config)
+        if os.path.exists(compile_root):
+            shutil.rmtree(compile_root)
+        src_cache = self.get_cache_dir_src(storages=storages, log=log, **config)
+        for path in os.listdir(src_cache):
+            path = os.path.join(src_cache, path)
             if not os.path.islink(path) and os.path.isdir(path):
                 shutil.rmtree(path)
 
@@ -128,9 +153,9 @@ class Builder(object):
         for dependency in self.get_dependencies(config.get('main_builder')):
             dependency.collect(**config)
 
-        current_cache_dir = self.cache_dir_current
+        current_cache_dir = self.get_cache_dir_current(**config)
         if not os.path.exists(current_cache_dir):
-            os.mkdir(current_cache_dir)
+            os.makedirs(current_cache_dir)
 
     def build_from_cache(self, **config):
         for dependency in self.get_dependencies(config.get('main_builder')):
@@ -138,7 +163,7 @@ class Builder(object):
 
         log = config.get('log')
         log = log.with_indent('building ' + self.name)
-        current_source_dir = self.cache_dir_current
+        current_source_dir = self.get_cache_dir_current(**config)
         for root, dirnames, filenames in os.walk(current_source_dir):
             relative_path = os.path.relpath(root, current_source_dir)
             if relative_path.startswith('.') and not len(relative_path) == 1:
@@ -147,7 +172,7 @@ class Builder(object):
                 if path.startswith('.') or ((os.path.sep + '.') in relative_path):
                     continue
                 path = os.path.join(relative_path, path)
-                is_used = self.uses_source(path)
+                is_used = self.uses_source(path, **config)
                 if log:
                     config['log'] = log.with_indent(path, logging_level=log.INFO_LOG if is_used else log.DEBUG_LOG)
 
@@ -236,10 +261,10 @@ class Builder(object):
                 log.write('resetting', self.name)
                 self.reset_observer()
 
-    def uses_source(self, path):
+    def uses_source(self, path, **config):
         used = False
 
-        used = used or self.get_build_path(path) is not None
+        used = used or self.get_build_path(path, **config) is not None
         used = used or self.is_css_config_path(path)
         used = used or self.is_frontend_config_path(path)
         used = used or (self.is_css_lib_path(path) and not self.is_excluded(path))
@@ -378,14 +403,17 @@ class Builder(object):
                 path = '.' + os.path.sep + path
             return path
 
-    def get_build_path(self, path):
+    def get_build_path(self, path, **config):
         """
         build the whole frontend
         """
-        if not path in self.source_map:
-            self.source_map[path] = self.generate_build_path(path)
+        platform_name = config['platform'].NAME
+        if not platform_name in self.source_map:
+            self.source_map[platform_name] = {}
+        if not path in self.source_map[platform_name]:
+            self.source_map[platform_name][path] = self.generate_build_path(path)
 
-        return self.source_map[path]
+        return self.source_map[platform_name][path]
 
     def is_excluded(self, path):
         ignore = False
@@ -417,7 +445,7 @@ class Builder(object):
         """
         config['path'] = path
         config['content'] = content
-        config['new_path'] = self.get_build_path(path)
+        config['new_path'] = self.get_build_path(**config)
         new_path = config['new_path']
 
         compile_as = None
@@ -458,13 +486,16 @@ class Builder(object):
                 config['path'].replace('.sass', '.scss')
 
             if not compile_as.endswith('config'):
-                compile_path = os.path.join(self.compile_dir, 'css', config['rel_path'])
+                compile_path = os.path.join(self.get_compile_dir(**config), 'css', config['rel_path'])
                 compile_dir = os.path.sep.join(compile_path.split(os.path.sep)[:-1])
-                main_builder.add_css_folder(os.path.realpath(os.path.join(self.compile_dir, 'css')))
+                main_builder.add_css_folder(os.path.realpath(os.path.join(self.get_compile_dir(**config), 'css')))
                 if not os.path.exists(compile_dir):
                     os.makedirs(compile_dir)
-                with open(compile_path, 'w+') as file:
-                    file.write(config['content'])
+                if config['content']:
+                    with open(compile_path, 'w+') as file:
+                        file.write(config['content'])
+                elif os.path.exists(compile_path):
+                    os.unlink(compile_path)  # TODO: should be ok in cache, right?
 
         # compile
         if not build:
@@ -476,13 +507,15 @@ class Builder(object):
 
     def copy_src(self, path, content, new_path, storages=None, log=None, **config):
         if new_path is not None:
+            new_path = config['platform'].patch_path(new_path, **config)
+
             if content is None:
                 log = log.with_indent('removing ' + new_path)
             else:
                 log = log.with_indent('copying ' + new_path)
 
-            if externalFrontendSettings.FILES_FRONTEND_POSTFIX:
-                new_path += '.' + config['main_builder'].name
+            if config.get('dry', False):
+                return True
             for storage in storages:
                 if content is None:
                     return storage.remove(new_path, log=log.with_indent(new_path))
@@ -506,7 +539,7 @@ class Builder(object):
             return False
         elif compile_as == 'css-config':
             import scss
-            scss.config.PROJECT_ROOT = self.cache_dir_current
+            scss.config.PROJECT_ROOT = self.get_cache_dir_current(**config)
             scss.config.DEBUG = self.debug
             _scss_opts = {
                 'compress': False,
@@ -547,14 +580,14 @@ class Builder(object):
 
                 parts = content_path.split(os.path.sep)
                 if not parts[1].startswith('consts'):  # and parts[0] == self.name:
-                    with open(os.path.join(self.compile_dir, 'css', parts[1]), 'a+') as file:
+                    with open(os.path.join(self.get_compile_dir(**config), 'css', parts[1]), 'a+') as file:
                         file.write(content_list[content_path])
 
             config['log'].write('loaded', str(len(self.css_vars.keys())), 'vars from', str(len(content_list)), 'files')
             return False  # content
         elif compile_as == 'scss':
             import scss
-            scss.config.PROJECT_ROOT = self.cache_dir_current
+            scss.config.PROJECT_ROOT = self.get_cache_dir_current(**config)
             scss.config.DEBUG = self.debug
             _scss_vars = self.css_vars
             _scss_opts = {
@@ -703,7 +736,7 @@ class Builder(object):
         self.update_configuration(storages, log=log, main_builder=main_builder)
 
     def load_config(self, **config):
-        current_cache_dir = self.cache_dir_current
+        current_cache_dir = self.get_cache_dir_current(**config)
         for dependency in self.get_dependencies(config.get('main_builder')):
             self.config = dict_merge(self.config, dependency.load_config(**config))
 
@@ -838,7 +871,7 @@ class StaticsBuilder(Builder):
         log = config.get('log', None)
         super(StaticsBuilder, self).collect(**config)
         main_builder = config['main_builder']
-        current_cache_dir = self.cache_dir_current
+        current_cache_dir = self.get_cache_dir_current(**config)
 
         found_files = SortedDict()
         for finder in get_finders():
@@ -891,14 +924,15 @@ class FrontendBuilder(Builder):
     def __init__(self, settings=None):
         super(FrontendBuilder, self).__init__(settings)
 
-        self.cache_dir_frontend = self.cache_dir_current
-        self.cache_dir_remote = self.cache_dir + os.path.sep + 'remote'
-        self.cache_dir_build = self.cache_dir + os.path.sep + 'build' + os.path.sep + self.name
-        self.cache_dir_built_css = self.cache_dir_build + os.path.sep + 'css' + os.path.sep + self.name
-        self.cache_dir_built_js = self.cache_dir_build + os.path.sep + 'js' + os.path.sep + self.name
-        self.compile_dir = self.compile_root + os.path.sep + self.name
+        try:
+            if settings.DEBUG:
+                src = settings.DEBUG_SRC
+            else:
+                raise Exception()
+        except:
+            src = settings.SRC
 
-        self.init_src(settings.SRC)
+        self.init_src(src)
         self.src_real = os.path.realpath(self.src.cache)
 
         def get_dependencies(main_builder=None):
@@ -910,8 +944,11 @@ class FrontendBuilder(Builder):
             return (entry for entry in settings.DEPENDS_ON if entry != main_builder)
         self.get_dependencies = get_dependencies
 
+    def get_cache_dir_frontend(self, **config):
+        return self.get_cache_dir_current(**config)
+
     def init_src(self, source):
-        self.src = WrappedSource(source, version_cache=self.cache_dir_remote)
+        self.src = WrappedSource(source, version_cache=self.get_remote_dir())
 
         if not os.path.exists(self.src.cache):
             raise Exception('FrontendBuilder need to be initialized with existing src directory.\
@@ -927,8 +964,8 @@ class FrontendBuilder(Builder):
             return started
 
         path = self.src_real
-        if os.path.islink(self.cache_dir_frontend):
-            path = os.path.realpath(self.cache_dir_frontend)
+        if os.path.islink(self.get_cache_dir_frontend(**config)):
+            path = os.path.realpath(self.get_cache_dir_frontend(**config))
         elif self.src.source_type == 'folder':
             path = self.src.source
         else:
@@ -954,8 +991,17 @@ class FrontendBuilder(Builder):
             config['main_builder'] = self
         log = config.get('log')
 
-        if not os.path.exists(self.cache_dir_frontend):
-            os.makedirs(self.cache_dir_frontend)
+        platform = config['platform'].NAME
+        supported_platforms = [p.NAME for p in self.supported_platforms]
+        if not platform in supported_platforms and not platform.split('.')[0] in supported_platforms:
+            if True:  # TODO: setting in frontend to be strict or not?
+                log.error('platform "%s" not supported by "%s"' % (platform, self.name))
+                return False
+            log.warn('platform "%s" not really supported by "%s". still trying to build' % (platform, self.name))
+
+        current_cache_dir = self.get_cache_dir_frontend(**config)
+        if not os.path.exists(current_cache_dir):
+            os.makedirs(current_cache_dir)
 
         self.host_root_url = reverse('api:api-root')# TODO:?, current_app=self.name)
         self.static_content_root_url = ''  # reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
@@ -973,11 +1019,13 @@ class FrontendBuilder(Builder):
 
         #1 collect sources
         if config.get('update', True):  # or build cache = empty
-            if not os.path.exists(self.cache_dir_built_css):
-                os.makedirs(self.cache_dir_built_css)
+            css_cache = self.get_cache_dir_build('css', **config)
+            if not os.path.exists(css_cache):
+                os.makedirs(css_cache)
 
-            if not os.path.exists(self.cache_dir_built_js):
-                os.makedirs(self.cache_dir_built_js)
+            js_cache = self.get_cache_dir_build('js', **config)
+            if not os.path.exists(js_cache):
+                os.makedirs(js_cache)
 
             ## if needed, checkout git
             self.collect(**config)
@@ -1009,8 +1057,8 @@ class FrontendBuilder(Builder):
 
         # compile
         config['log'] = log.with_indent('compiling', single_line=not self.debug)
-        if not os.path.exists(self.compile_dir):
-            os.makedirs(self.compile_dir)
+        if not os.path.exists(self.get_compile_dir(**config)):
+            os.makedirs(self.get_compile_dir(**config))
         self.compile(**config)
 
         # 4 observer
@@ -1023,7 +1071,7 @@ class FrontendBuilder(Builder):
         log = config.get('log', None)
         super(FrontendBuilder, self).collect(**config)
         main_builder = config['main_builder']
-        current_cache_dir = self.cache_dir_frontend
+        current_cache_dir = self.get_cache_dir_frontend(**config)
 
         # only collect, if its not a link for development stage
         if not os.path.islink(current_cache_dir):

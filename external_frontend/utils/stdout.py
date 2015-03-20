@@ -1,4 +1,4 @@
-
+# TODO: when a log is logged for the current log level, but its parent isnt, the get_indent must return the parent_str like in async
 class WrappedOutput(object):
     ALL_LOGS = 9999  # TODO: as property with highest available log + 1
     INFO_LOG = 0
@@ -63,7 +63,14 @@ class WrappedOutput(object):
     def log(self, *content, **kwargs):
         return self._write(self.stdout, *content, **kwargs)
 
+    def warn(self, *content, **kwargs):
+        kwargs['logging_level'] = self.WARNING_LOG
+        if self.stderr is None:
+            return self.log(*content, **kwargs)
+        return self._write(self.stderr, *content)
+
     def error(self, *content, **kwargs):
+        kwargs['logging_level'] = self.ERROR_LOG
         if self.stderr is None:
             return self.log(*content, **kwargs)
         return self._write(self.stderr, *content)

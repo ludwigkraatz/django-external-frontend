@@ -14,17 +14,14 @@ def export_folder(self, handler, cache_dir):
     current_cache_dir = cache_dir
     for current_root, dirnames, filenames in os.walk(current_source):
         relative_path = os.path.relpath(current_root, current_source)
-        for path in dirnames:
-            if path.startswith('.') or (os.path.sep + '.') in relative_path:
-                continue
-            path = os.path.join(relative_path, path)
-            if not os.path.exists(os.path.join(current_cache_dir, path)):
-                os.mkdir(os.path.join(current_cache_dir, path))
 
         for path in filenames:
-            if path.startswith('.') or (os.path.sep + '.') in relative_path:
+            if path.startswith('.') or ('.' + os.path.sep) in relative_path or (os.path.sep + '.') in relative_path:
                 continue
             path = os.path.join(relative_path, path)
+            dir_path = os.path.dirname(path)
+            if not os.path.exists(os.path.join(current_cache_dir, dir_path)):
+                os.makedirs(os.path.join(current_cache_dir, dir_path))
             if os.path.exists(os.path.join(current_cache_dir, path)):
                 os.unlink(os.path.join(current_cache_dir, path))
             os.symlink(os.path.join(current_source, path), current_cache_dir + os.path.sep + path)

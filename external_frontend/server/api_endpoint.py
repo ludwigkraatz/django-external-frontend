@@ -38,7 +38,7 @@ class StaticsServer(RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
 
-        requested_file = kwargs.get('file')
+        requested_file = 'web/' + kwargs.get('file')  # becuse it uses the web platform
         if not requested_file:
             return ApiResponse({}, 404).finalize_for(request)
         requirejsFallback = ''

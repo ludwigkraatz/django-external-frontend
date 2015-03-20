@@ -28,7 +28,7 @@ config = {
             'ENDPOINT': None,
             'BUILDER': None,
             'PLATFORM': None,
-            'SUPPORTED_PLATFORMS': [],
+            'PLATFORMS': [],
             'API_SERVED_STORAGE': None,
         },
         'FRONTEND_COLLECTION': {},
@@ -41,11 +41,14 @@ config = {
             'NAME': None,
             'SRC_NAME': None,
             'SRC': None,
+            'DEBUG_SRC': None,
             'DEPENDS_ON': [],
             'FILTER': None,
             'EXCLUDE': None,
             'TYPE': None,  # lib, app, widget, css, img, partial
             'VERSION': None,
+            'PLATFORM': None,
+            'SUPPORTED_PLATFORMS': [],
             'CONFIG': None
         #   'FINGERPRINT': '02:13:..'
         #   'CERT': ''
@@ -97,6 +100,7 @@ config = {
             'TYPE': 'frontend',
             'FILTER': '',
             'EXCLUDE': '',
+            'PLATFORM': 'web',
             'CONFIG': {}  # TODO: is it safe to use {} here?
         },
         'BUILDER_COLLECTION': {
@@ -153,12 +157,25 @@ config = {
             }
         },
         'PLATFORM': {
-            'NAME': 'default',
             'STORAGE': 'default',
+            'CLASS': 'external_frontend.platform.Platform'
         },
         'PLATFORM_COLLECTION': {
             'web': {
-                'NAME': 'web'
+                'NAME': 'web',
+                'CLASS': 'external_frontend.platform.web.Web'
+            },
+            'mobile': {
+                'NAME': 'mobile',
+                'CLASS': 'external_frontend.platform.web.Web'
+            },
+            'mobile.ios': {
+                'NAME': 'mobile.ios',
+                'CLASS': 'external_frontend.platform.ionic.IOS'
+            },
+            'mobile.android': {
+                'NAME': 'mobile.android',
+                'CLASS': 'external_frontend.platform.ionic.Android'
             }
         }
     },
@@ -168,7 +185,8 @@ config = {
         'FRONTEND.ENDPOINT',
         #'FRONTEND.STORAGE_METHOD',
         'STORAGE.CLASS',
-        'BUILDER.CLASS'
+        'BUILDER.CLASS',
+        'PLATFORM.CLASS',
     ),
 
     'ONE_TO_MANY': {
@@ -178,7 +196,8 @@ config = {
         'PLATFORM': 'PLATFORM_COLLECTION|NAME',
         'WORDING_HANDLER': 'WORDING_HANDLER_COLLECTION|NAME',
         'PLATFORM.STORAGE': 'PLATFORM.USED_STORAGE',
-        'FRONTEND.PLATFORM': 'FRONTEND.SUPPORTED_PLATFORMS',
+        'FRONTEND.PLATFORM': 'FRONTEND.PLATFORMS',
+        'BUILDER.PLATFORM': 'BUILDER.SUPPORTED_PLATFORMS',
     },
 
     'LINK': {
@@ -186,12 +205,14 @@ config = {
         'FRONTEND.BUILDER': 'BUILDER_COLLECTION',
         'BUILDER.DEPENDS_ON': 'BUILDER_COLLECTION',
         'FRONTEND.PLATFORM': 'PLATFORM_COLLECTION',
+        'BUILDER.PLATFORM': 'PLATFORM_COLLECTION',
         'FRONTEND.API_SERVED_STORAGE': 'STORAGE_COLLECTION'
     },
 
     'INIT': [
         'BUILDER',
-        'STORAGE'
+        'STORAGE',
+        'PLATFORM'
     ],
 
     'GLOBALS': [
