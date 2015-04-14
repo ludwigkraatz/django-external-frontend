@@ -17,7 +17,7 @@ from introspective_api.reverse import reverse_nested
 from ..utils.source import WrappedSource, wrappedGitMethodMap
 
 
-def generate_handler(storages, builder, src, log, main_builder):
+def generate_handler(storages, builder, src, log, main_builder, frontend, platform):
     class Handler(FileSystemEventHandler):
         def prepare_path(self, path):
             path = os.path.relpath(path, src)
@@ -33,34 +33,72 @@ def generate_handler(storages, builder, src, log, main_builder):
                 with open(event.src_path, 'r') as content:
                     path = self.prepare_path(event.src_path)
                     log.write("Created: " + path)
-                    builder.update(path=path, content=content.read(), storages=storages, log=log.with_indent(), main_builder=main_builder)
+                    builder.update(
+                        path=path,
+                        content=content.read(),
+                        storages=storages,
+                        log=log.with_indent(),
+                        main_builder=main_builder,
+                        platform=platform,
+                        frontend=frontend
+                        )
 
         def on_deleted(self, event):
             if not event.is_directory and not (os.path.sep + '.') in event.src_path:
                 path = self.prepare_path(event.src_path)
                 log.write("Removed: " + path)
-                builder.remove(path=path, storages=storages, log=log.with_indent(), main_builder=main_builder)
+                builder.remove(
+                    path=path,
+                    storages=storages,
+                    log=log.with_indent(),
+                    main_builder=main_builder,
+                    platform=platform,
+                    frontend=frontend
+                )
 
         def on_moved(self, event):
             if not event.is_directory and not (os.path.sep + '.') in event.src_path:
                 if (os.path.sep + '.') in event.dest_path:
                     path = self.prepare_path(event.dest_path)
                     log.write("Removed: " + path)
-                    builder.remove(path=path, storages=storages, log=log.with_indent(), main_builder=main_builder)
+                    builder.remove(path=path, storages=storages, log=log.with_indent(), main_builder=main_builder, platform=platform)
                 else:
                     with open(event.dest_path, 'r') as content:
                         path = self.prepare_path(event.src_path)
                         dest_path = self.prepare_path(event.dest_path)
                         log.write("Moved: " + path + ' to ' + dest_path)
-                        builder.remove(path=path, storages=storages, log=log.with_indent())
-                        builder.update(path=dest_path, content=content.read(), storages=storages, log=log.with_indent(), main_builder=main_builder)
+                        builder.remove(
+                            path=path,
+                            storages=storages,
+                            log=log.with_indent(),
+                            main_builder=main_builder,
+                            platform=platform,
+                            frontend=frontend
+                        )
+                        builder.update(
+                            path=dest_path,
+                            content=content.read(),
+                            storages=storages,
+                            log=log.with_indent(),
+                            main_builder=main_builder,
+                            platform=platform,
+                            frontend=frontend
+                        )
 
         def on_modified(self, event):
             if not event.is_directory and not (os.path.sep + '.') in event.src_path:
                 with open(event.src_path, 'r') as content:
                     path = self.prepare_path(event.src_path)
                     log.write("Modified: " + path)
-                    builder.update(path=path, content=content.read(), storages=storages, log=log.with_indent(), main_builder=main_builder)
+                    builder.update(
+                        path=path,
+                        content=content.read(),
+                        storages=storages,
+                        log=log.with_indent(),
+                        main_builder=main_builder,
+                        platform=platform,
+                        frontend=frontend
+                    )
 
     return Handler()
 
@@ -93,19 +131,10 @@ class Builder(object):
         self.dependency_map = {}
 
         self.source_map = {}
+        self.source_versions = {}
         self.css_vars = {}
         self.css_config = SortedDict()
-        self.compiler_queues = SortedDict((
-            ('config', SortedDict({None: SortedDict()})),
-            ('js-config', SortedDict({None: SortedDict()})),
-            ('css-config', SortedDict({None: SortedDict()})),
-            ('sass', SortedDict({None: SortedDict()})),
-            ('scss', SortedDict({None: SortedDict()})),
-            ('css', SortedDict({None: SortedDict()})),
-            #('img', SortedDict({None: SortedDict()})),
-            ('js', SortedDict({None: SortedDict()})),
-            #('html', SortedDict({None: SortedDict()})),
-        ))
+
         # default
         self.config = {
             'unversioned': [],
@@ -139,6 +168,20 @@ class Builder(object):
             '' if dir_type is None else (os.path.sep + dir_type)
         )
 
+    def pre_build(self, **config):
+        self.compiler_queues = SortedDict((
+            ('config', SortedDict({None: SortedDict()})),
+            ('js-config', SortedDict({None: SortedDict()})),
+            ('css-config', SortedDict({None: SortedDict()})),
+            ('sass', SortedDict({None: SortedDict()})),
+            ('scss', SortedDict({None: SortedDict()})),
+            ('css', SortedDict({None: SortedDict()})),
+            #('img', SortedDict({None: SortedDict()})),
+            ('js', SortedDict({None: SortedDict()})),
+            #('html', SortedDict({None: SortedDict()})),
+            ('platform', SortedDict({None: SortedDict()})),
+        ))
+
     def clean(self, storages, log=None, **config):
         compile_root = self.get_compile_dir(**config)
         if os.path.exists(compile_root):
@@ -148,9 +191,11 @@ class Builder(object):
             path = os.path.join(src_cache, path)
             if not os.path.islink(path) and os.path.isdir(path):
                 shutil.rmtree(path)
+        for storage in storages:
+            storage.clean(log=log, frontend=config.get('main_builder').name, platform=config.get('platform'))
 
     def collect(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             dependency.collect(**config)
 
         current_cache_dir = self.get_cache_dir_current(**config)
@@ -158,7 +203,7 @@ class Builder(object):
             os.makedirs(current_cache_dir)
 
     def build_from_cache(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             dependency.build_from_cache(**config)
 
         log = config.get('log')
@@ -183,19 +228,19 @@ class Builder(object):
                     config['log'].write('not used')
 
     def build_from_db(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             dependency.build_from_db(**config)
         # TODO
 
     def update_db(self, **config):
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             dependency.update_db(**config)
         # TODO
 
     def init_dependencies(self, **config):
         main_builder = config.get('main_builder')
         main_builder.dependency_map[self.name] = self
-        for dependency in self.get_dependencies(main_builder):
+        for dependency in self.get_dependencies(main_builder, config.get('platform')):
             dependency.init_dependencies(main_builder=main_builder)  # TODO: this doesnt look thread safe
 
     def build(self, **config):
@@ -206,7 +251,7 @@ class Builder(object):
 
     def init_observers(self, **config):
         started = 0
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             started += dependency.init_observers(**config)
         return started
 
@@ -216,11 +261,15 @@ class Builder(object):
             self,
             path,
             log=config['log'].async(),
-            main_builder=config.get('main_builder')
+            main_builder=config.get('main_builder'),
+            platform=config['platform'],
+            frontend=config['frontend']
         )
         watcher = self.register_handler(handler, path)
+        main_builder = config.get('main_builder', None)
+        platform = config.get('platform', None)
 
-        self.observers_watcher[config.get('main_builder', None)] = (handler, watcher)
+        self.observers_watcher[(main_builder, platform)] = (handler, watcher)
         config['log'].write('started observer for "%s" on %s' % (self.name, path))
 
     def watch(self, **config):
@@ -248,14 +297,14 @@ class Builder(object):
         self.observer = None
         self.observers_watcher = {}
 
-    def stop_watching(self, log, main_builder=None):
+    def stop_watching(self, log, main_builder=None, platform=None):
         main_builder = main_builder or self
-        for dependency in self.get_dependencies(main_builder):
-            dependency.stop_watching(log=log, main_builder=main_builder)
+        for dependency in self.get_dependencies(main_builder, platform):
+            dependency.stop_watching(log=log, main_builder=main_builder, platform=platform)
 
-        if main_builder in self.observers_watcher:
-            self.observer.remove_handler_for_watch(*self.observers_watcher[main_builder])
-            del self.observers_watcher[main_builder]
+        if (main_builder, platform) in self.observers_watcher:
+            self.observer.remove_handler_for_watch(*self.observers_watcher[(main_builder, platform)])
+            del self.observers_watcher[(main_builder, platform)]
             log.write('remove watcher "%s"' % (self.name))
             if not self.observers_watcher:
                 log.write('resetting', self.name)
@@ -269,6 +318,9 @@ class Builder(object):
         used = used or self.is_frontend_config_path(path)
         used = used or (self.is_css_lib_path(path) and not self.is_excluded(path))
         return used
+
+    def get_static_url(self, **config):
+        return config['platform'].get_static_url(**config)
 
     def generate_build_path(self, orig_path):
         built_root = '.'
@@ -297,10 +349,6 @@ class Builder(object):
                 path = path.replace(file_name, file_name.replace('.' + self.current_stage, ''))
             else:
                 ignore = True
-
-        if path == self.get_frontend_config_dest_path():
-            unversioned = True
-            ignore = False  # TODO: why is this needed? does filter exclude root dir file?
 
         if self.get_config('staging', 'configurations'):
             for configuration, config in self.get_config('staging', 'configurations').items():
@@ -357,6 +405,7 @@ class Builder(object):
                 built_root = 'partials/'
                 collected = True
             elif type in ['svg', 'ico', 'png', 'jpeg', 'jpg', 'gif']:
+                unversioned = True  # TODO: shouldnt be like that.
                 if 'css' in path:
                     built_root = 'css/'
                 else:
@@ -376,7 +425,7 @@ class Builder(object):
             if unversioned is None:
                 if self.get_config('unversioned'):
                     for pattern in self.get_config('unversioned'):
-                        if pattern in path:  # TODO: regex?
+                        if re.compile(pattern).match(path):
                             unversioned = True
 
             if not unversioned and (self.get_config('unversioned', None) is None or path not in self.get_config('unversioned')):
@@ -386,32 +435,37 @@ class Builder(object):
                     file_name = '.'.join(file_parts[:-1])
                 else:
                     file_name = '.'.join(file_parts)
-                path = os.path.sep.join((
+                path = os.path.join(
                     os.path.sep.join(paths[:-1]) or '.',
                     file_name+os.path.sep+'{version}',
                     paths[-1]
-                ))
+                )
             else:
                 path = path
 
-        if ignore or not collected:
+        if ignore:
             return None
+        elif not collected:
+            return 0
         else:
             path = path.replace(self.src_name, self.name)
             path = os.path.join(built_root, path)
             if path.find(os.path.sep) <= 0:
                 path = '.' + os.path.sep + path
+            if not unversioned:  # TODO: setting
+                path = '{version_root}' + os.path.sep + path
             return path
 
     def get_build_path(self, path, **config):
         """
         build the whole frontend
         """
-        platform_name = config['platform'].NAME
+        platform = config['platform']
+        platform_name = platform.NAME
         if not platform_name in self.source_map:
             self.source_map[platform_name] = {}
         if not path in self.source_map[platform_name]:
-            self.source_map[platform_name][path] = self.generate_build_path(path)
+            self.source_map[platform_name][path] = platform.generate_build_path(path, self.generate_build_path(path)) or None
 
         return self.source_map[platform_name][path]
 
@@ -425,6 +479,9 @@ class Builder(object):
 
     def is_frontend_config_path(self, path):
         return path == self.get_frontend_config_path()
+
+    def js_config_destination(self, **config):
+        return self.get_frontend_config_dest_path()
 
     def is_css_config_path(self, path):
         return (
@@ -451,7 +508,7 @@ class Builder(object):
         compile_as = None
         if self.is_frontend_config_path(path):
             compile_as = 'config'
-            config['new_path'] = 'config.json'  # todo self.js_config_dest
+            config['new_path'] = self.js_config_destination(**config)
             config['rel_path'] = None
         elif self.is_css_config_path(path):
             compile_as = 'css-config'
@@ -500,6 +557,10 @@ class Builder(object):
         # compile
         if not build:
             try:
+                if compile_as == 'css-config':
+                    compile_only = ['scss', 'css-config']
+                else:
+                    compile_only = (compile_as, config['new_path'])
                 main_builder.compile(**config)
             except Exception, e:
                 import traceback
@@ -507,8 +568,6 @@ class Builder(object):
 
     def copy_src(self, path, content, new_path, storages=None, log=None, **config):
         if new_path is not None:
-            new_path = config['platform'].patch_path(new_path, **config)
-
             if content is None:
                 log = log.with_indent('removing ' + new_path)
             else:
@@ -518,9 +577,19 @@ class Builder(object):
                 return True
             for storage in storages:
                 if content is None:
-                    return storage.remove(new_path, log=log.with_indent(new_path))
+                    return storage.remove(new_path, log=log.with_indent(new_path), current_builder=self, main_builder=config['main_builder'], platform=config['platform'], orig_path=path, source=getattr(self, 'src', None))
                 else:
-                    return storage.update(new_path, content, log=log.with_indent(new_path))
+                    return storage.update(
+                        new_path,
+                        content,
+                        log=log.with_indent(new_path),
+                        current_builder=self,
+                        main_builder=config['main_builder'],
+                        frontend=config['frontend'],
+                        platform=config['platform'],
+                        orig_path=path,
+                        source=getattr(self, 'src', None)
+                    )
         else:
             log.write('ignored')
 
@@ -621,7 +690,7 @@ class Builder(object):
 
         return False
 
-    def compile(self, **config):
+    def compile(self, compile_only=None, **config):
         log = config['log']
         #self.update_configuration(**config)
         config.pop('content', None)
@@ -630,10 +699,22 @@ class Builder(object):
         config.pop('new_path', None)
 
         for compile_as, queue in self.compiler_queues.items():
+            if compile_only:
+                if isinstance(compile_only, basestring) and compile_as != compile_only:
+                    continue
+                if isinstance(compile_only, list) and compile_as not in compile_only:
+                    continue
+                if isinstance(compile_only, tuple) and compile_as != compile_only[0]:
+                    continue
+
+            content_found = False
             current_log = log.with_indent(compile_as)
             last_app = None
             apps_content = SortedDict()
             for new_path, contents in queue.items():
+                if isinstance(compile_only, tuple) and new_path not in compile_only:
+                    continue
+
                 cur_log = current_log.with_indent(str(new_path))
                 content = -1
                 content_list = SortedDict()
@@ -652,6 +733,7 @@ class Builder(object):
                     #raise Exception(str((compile_as, new_path, contents)))
                     cur_log.write('no content')
                     continue
+                content_found = True
 
                 config['log'] = cur_log
                 compile_config = dict(content=content, content_list=content_list, path=path_config['rel_path'], new_path=new_path, **config)
@@ -663,7 +745,7 @@ class Builder(object):
                 if current_app is not None and last_app != current_app:
                     if last_app is not None:
                         if compile_as == 'scss':  # TODO: genrating a core.css for each frontend. now it lecks new_path for core.css
-                            new_path = self.generate_build_path('./css' + os.path.sep + last_app + os.path.sep + 'core.css')
+                            new_path = self.get_build_path('./css' + os.path.sep + last_app + os.path.sep + 'core.css', **config)
 
                             compile_config = dict(content=False, content_list=apps_content, path=new_path, new_path=new_path, **config)
                             content = self.compile_as(compile_as, **compile_config)
@@ -679,14 +761,17 @@ class Builder(object):
                 if not last_app:
                     last_app = self.name
                 #build_path = self.generate_build_path('./css/core.css')
-                build_path = self.generate_build_path('./css' + os.path.sep + last_app + os.path.sep + 'core.css')
+                build_path = self.get_build_path('./css' + os.path.sep + last_app + os.path.sep + 'core.css', **config)
                 compile_config = dict(content=False, content_list=self.css_config, path=build_path, new_path=build_path, **config)
                 content = self.compile_as(compile_as, **compile_config)
                 if content is not False:
                     compile_config['content'] = content
                     self.copy_src(**compile_config)
 
-            self.compiler_queues[compile_as] = SortedDict()
+            if compile_as == 'platform':
+                compile_config['platform'].compile(builder=self, queue=queue, **compile_config)
+
+            #self.compiler_queues[compile_as] = SortedDict()
 
     def remove(self, **config):  #path, storages, log=None, main_builder=None):
         """
@@ -722,7 +807,7 @@ class Builder(object):
     def set_default_config(self, config):
         self.config = dict_merge(config, self.config)
 
-    def load_data(self, storages, main_builder=None, log=None):
+    def load_data(self, storages, main_builder=None, log=None, **config):
         raise Exception()
         log = log.with_indent('loading styles')
         for root, dirnames, filenames in os.walk(self.src.cache):
@@ -733,11 +818,11 @@ class Builder(object):
                 with open(os.path.join(self.src.cache, path), 'r') as content:
                     self.update(path, content.read(), storages=storages, log=log)
 
-        self.update_configuration(storages, log=log, main_builder=main_builder)
+        self.update_configuration(storages, log=log, main_builder=main_builder, **config)
 
     def load_config(self, **config):
         current_cache_dir = self.get_cache_dir_current(**config)
-        for dependency in self.get_dependencies(config.get('main_builder')):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
             self.config = dict_merge(self.config, dependency.load_config(**config))
 
         # load config file
@@ -768,10 +853,10 @@ class Builder(object):
         if config['main_builder'] is self:
             # write to storage
             config['path'] = self.get_frontend_config_dest_path()
-            config['content'] = json.dumps(self.build_frontend_config())  # maybe just update from updated content in **config
+            config['content'] = json.dumps(self.build_frontend_config(**config))  # maybe just update from updated content in **config
             self.update(**config)
 
-    def build_frontend_config(self, content=None):
+    def build_frontend_config(self, content=None, **compile_config):
         config = {}
         for key in ['start', 'frontends', 'requirejs']:
             config[key] = self.get_config(key) or {}
@@ -838,7 +923,21 @@ class Builder(object):
             }
 
         config['requirejs']['baseUrl'] = self.static_root_url
+
+        config['requirejs']['versions'] = dict_merge(self.get_versions(**compile_config), config['requirejs'].get('versions', {}))
+        config['requirejs']['baseUrl'] = self.static_root_url
         return config
+
+    def get_versions(self, platform, **config):
+        return self.source_versions.get(platform.NAME, {})
+
+    def set_version(self, builder, path, version, platform, **config):
+        if platform.NAME not in self.source_versions:
+            self.source_versions[platform.NAME] = {}
+        if builder.name not in self.source_versions[platform.NAME]:
+            self.source_versions[platform.NAME][builder.name] = {}
+
+        self.source_versions[platform.NAME][builder.name][path] = version
 
 
 class StaticsBuilder(Builder):
@@ -846,7 +945,7 @@ class StaticsBuilder(Builder):
         super(StaticsBuilder, self).__init__(settings)
         self.found_folders = []
 
-    def get_dependencies(self, main_builder):
+    def get_dependencies(self, main_builder, platform):
         return []  # THE (only one) Statics Builder never has dependencies
 
     def init_observers(self, **config):
@@ -935,13 +1034,14 @@ class FrontendBuilder(Builder):
         self.init_src(src)
         self.src_real = os.path.realpath(self.src.cache)
 
-        def get_dependencies(main_builder=None):
+        def get_dependencies(main_builder=None, platform=None):
             #raise Exception(str(settings.__dict__['_dict']))
             #raise Exception(str([setting.NAME for setting in settings.DEPENDS_ON]))
             #raise Exception([str(setting) for setting in settings.DEPENDS_ON])
+            platform_builder = platform.ADDITIONAL_BUILDER if platform and main_builder is self else []
             if main_builder is None:
-                return settings.DEPENDS_ON
-            return (entry for entry in settings.DEPENDS_ON if entry != main_builder)
+                return settings.DEPENDS_ON + platform_builder
+            return list(entry for entry in settings.DEPENDS_ON if entry != main_builder) + platform_builder
         self.get_dependencies = get_dependencies
 
     def get_cache_dir_frontend(self, **config):
@@ -959,8 +1059,9 @@ class FrontendBuilder(Builder):
         started += super(FrontendBuilder, self).init_observers(**config)
 
         main_builder = config.get('main_builder', None)
+        platform = config.get('platform', None)
 
-        if main_builder in self.observers_watcher:
+        if (main_builder, platform) in self.observers_watcher:
             return started
 
         path = self.src_real
@@ -987,10 +1088,12 @@ class FrontendBuilder(Builder):
             skip_db
             update
         """
+        self.pre_build(**config)
         if not 'main_builder' in config:
             config['main_builder'] = self
         log = config.get('log')
 
+        backend = config['frontend'].BACKEND_HOST
         platform = config['platform'].NAME
         supported_platforms = [p.NAME for p in self.supported_platforms]
         if not platform in supported_platforms and not platform.split('.')[0] in supported_platforms:
@@ -1003,12 +1106,9 @@ class FrontendBuilder(Builder):
         if not os.path.exists(current_cache_dir):
             os.makedirs(current_cache_dir)
 
-        self.host_root_url = reverse('api:api-root')# TODO:?, current_app=self.name)
+        self.host_root_url = (backend if backend else '') + reverse('api:api-root')# TODO:?, current_app=self.name)
         self.static_content_root_url = ''  # reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
-        if externalFrontendSettings.STATICS_OVER_API:
-            self.static_root_url = reverse_nested('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+':static-root', current_app=self.name)
-        else:
-            self.static_root_url = settings.STATIC_URL
+        self.static_root_url = self.get_static_url(**config)
         self.static_img_root_url = self.static_root_url + 'img/'
         self.static_js_root_url = self.static_root_url + 'js/'
 
@@ -1075,5 +1175,4 @@ class FrontendBuilder(Builder):
 
         # only collect, if its not a link for development stage
         if not os.path.islink(current_cache_dir):
-            self.src.export(current_cache_dir, log=log)
-
+            self.src.export(current_cache_dir, log=log, filter=self.filter)

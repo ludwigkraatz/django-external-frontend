@@ -30,6 +30,7 @@ config = {
             'PLATFORM': None,
             'PLATFORMS': [],
             'API_SERVED_STORAGE': None,
+            'BACKEND_HOST': None,
             'STAGE': None,
         },
         'FRONTEND_COLLECTION': {},
@@ -59,13 +60,16 @@ config = {
             'NAME': None,
             'STORAGE': None,
             'USED_STORAGE': [],
+            'ADDITIONAL_BUILDER': [],
+            'FRONTEND_URL': None,  # TODO: append to cors list if its served by this installation
         },
         'PLATFORM_COLLECTION': {},
         'STORAGE': {
             'NAME': None,
             'ROOT': None,
             'FILTER': None,
-            'CLEAN_BUILD': None
+            'CLEAN_BUILD': None,
+            'REQUIRES_VERSIONED': None
         },
         'STORAGE_COLLECTION': {}
     },
@@ -83,7 +87,8 @@ config = {
             'WORDING_HANDLER': 'default',
             'ENDPOINT': '',
             'PLATFORM': 'web',
-            'API_SERVED_STORAGE': 'default'
+            'BACKEND_HOST': '',
+            'API_SERVED_STORAGE': 'default',
             'STAGE': 'development' if django_settings.DEBUG else 'production',
         },
         'WORDINGS': {
@@ -91,7 +96,21 @@ config = {
             'BACKEND': 'external_frontend.wordings.DBWordingsBackend'
         },
         'STORAGE': {
+            #'NAME': 'default',,
             'REQUIRES_VERSIONED': False
+        },
+        'STORAGE_COLLECTION': {
+            'default': {
+                'NAME': 'default',
+                'CLASS': 'external_frontend.storage.StaticsStorage',
+                'CLEAN_BUILD': True
+            },
+            'ionic': {
+                'NAME': 'ionic',
+                'CLASS': 'external_frontend.storage.StaticsStorage',
+                'CLEAN_BUILD': True,
+                'REQUIRES_VERSIONED': True  # ionic view app needs versioning.
+            }
         },
         'BUILDER': {
             'SRC_NAME': '',
@@ -112,11 +131,25 @@ config = {
                 'PROTECTED': True,
                 'CONFIG': {
                     'unversioned': [
-                        'introspective_api/object.js',
-                        'introspective_api/log.js',
-                        'introspective_api/endpoint.js',
-                        'introspective_api/client.js',
+                        '^introspective_api/object.js',
+                        '^introspective_api/log.js',
+                        '^introspective_api/endpoint.js',
+                        '^introspective_api/client.js',
                     ],
+                }
+            },
+            'ionic': {
+                'NAME': 'ionic',
+                'SRC': 'https://github.com/driftyco/ionic.git',
+                'TYPE': 'lib',
+                'FILTER': '^release',
+                'CONFIG': {
+                    'unversioned': [
+                        '^release/js/ionic.min.js'
+                    ],
+                    'rename': {
+                        #'^release/': ''
+                    }
                 }
             },
             'basic-frontend': {
@@ -127,7 +160,7 @@ config = {
             },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@73268ea91175983f056da2982477e141f62f72bf',
+                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@36c8917faf3fa99d8866802baf630cf88889aca9',
                 'FILTER': '^fancy-frontend/',
                 'DEPENDS_ON': ['basic-frontend'],
                 'TYPE': 'app',
@@ -137,7 +170,7 @@ config = {
                 'NAME': 'fancy-angular',
                 #'FILTER': '^fancy-angular/',
                 #'SRC_NAME': 'fancy_angular',
-                'SRC': 'https://github.com/suncircle/fancy-angular.git@09c695544130187944e87c20bf88356ef8371881',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git@0c2b3fb786cd3554330e9127c30b18e12e617ac1',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },
@@ -158,24 +191,33 @@ config = {
         },
         'PLATFORM': {
             'STORAGE': 'default',
-            'CLASS': 'external_frontend.platform.Platform'
+            'CLASS': 'external_frontend.platform.Platform',
+            'ADDITIONAL_BUILDER': [],
+            'FRONTEND_HOST': '',
         },
         'PLATFORM_COLLECTION': {
             'web': {
                 'NAME': 'web',
-                'CLASS': 'external_frontend.platform.web.Web'
+                'CLASS': 'external_frontend.platform.web.Web',
+                'FRONTEND_URL': '{host}/api/frontend/{frontend}/statics/',  # when used STATICS_OVER_API
             },
             'mobile': {
                 'NAME': 'mobile',
-                'CLASS': 'external_frontend.platform.web.Web'
+                'CLASS': 'external_frontend.platform.web.Web',
             },
             'mobile.ios': {
                 'NAME': 'mobile.ios',
-                'CLASS': 'external_frontend.platform.ionic.IOS'
+                'CLASS': 'external_frontend.platform.ionic.IOS',
+                'FRONTEND_URL': 'localhost:8100/',
+                'ADDITIONAL_BUILDER': ['ionic'],
+                'USED_STORAGE': ['ionic']
             },
             'mobile.android': {
                 'NAME': 'mobile.android',
-                'CLASS': 'external_frontend.platform.ionic.Android'
+                'CLASS': 'external_frontend.platform.ionic.Android',
+                'FRONTEND_URL': 'localhost:8100/',
+                'ADDITIONAL_BUILDER': ['ionic'],
+                #'STORAGE': 'ionic'
             }
         }
     },
@@ -204,6 +246,7 @@ config = {
         'PLATFORM.STORAGE': 'STORAGE_COLLECTION',
         'FRONTEND.BUILDER': 'BUILDER_COLLECTION',
         'BUILDER.DEPENDS_ON': 'BUILDER_COLLECTION',
+        'PLATFORM.ADDITIONAL_BUILDER': 'BUILDER_COLLECTION',
         'FRONTEND.PLATFORM': 'PLATFORM_COLLECTION',
         'BUILDER.PLATFORM': 'PLATFORM_COLLECTION',
         'FRONTEND.API_SERVED_STORAGE': 'STORAGE_COLLECTION'

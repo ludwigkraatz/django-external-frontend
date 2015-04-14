@@ -22,14 +22,16 @@ class StaticsServer(RetrieveAPIView):
     ]
 
     def __init__(self, *args, **kwargs):
-        import os
         super(StaticsServer, self).__init__(*args, **kwargs)
         try:
-            self.storages = [self.get_config()['frontend'].API_SERVED_STORAGE]
+            self.frontend = self.get_config()['frontend']
+            self.platform = self.get_config().get('platform', None)
         except KeyError:
             raise
             raise Exception('StaticsServer view needs to be initialized with "frontend" defined in view_config\
                             or with EXTERNAL_FRONTEND.FRONTEND.BUILDER.STORAGE setting')
+
+        self.storages = [self.frontend.API_SERVED_STORAGE]
 
     def get_format_suffix(self, **kwargs):
         if len(kwargs.get('file').split('.')) > 2 and kwargs.get('file').split('.')[-1] == 'js' and kwargs.get('file').split('.')[-2] in ['json', 'html']:
@@ -38,23 +40,28 @@ class StaticsServer(RetrieveAPIView):
 
     def get(self, request, *args, **kwargs):
 
-        requested_file = 'web/' + kwargs.get('file')  # becuse it uses the web platform
+        requested_file = kwargs.get('file')
         if not requested_file:
             return ApiResponse({}, 404).finalize_for(request)
         requirejsFallback = ''
         if self.get_format_suffix(**kwargs).split('.') > 2:
             requirejsFallback = '.'.join(requested_file.split('.')[0:-1])
-        if settings.FILES_FRONTEND_POSTFIX:
-            requested_file += '.'+ self.get_config()['frontend'].NAME
-            if requirejsFallback:
-                requirejsFallback += '.'+ self.get_config()['frontend'].NAME
 
         checked_dirs = []
+        debug_info = []
         for storage in self.storages:
             try:
-                return ApiResponse(storage.get(requested_file, requirejsFallback=requirejsFallback)).finalize_for(request)
-            except storage.PathNotFound:
+                return ApiResponse(
+                    storage.get(
+                        requested_file,
+                        requirejsFallback=requirejsFallback,
+                        frontend=self.frontend,
+                        platform=self.platform
+                    )
+                ).finalize_for(request)
+            except storage.PathNotFound, e:
                 checked_dirs.append(storage.root)
+                debug_info.append(e.debug_info)
 
         file_path = ''
         file_name = ''
@@ -71,12 +78,4 @@ class StaticsServer(RetrieveAPIView):
                 else:
                     break
 
-        debug_info = {
-            'requested': requested_file,
-            'requirejsFallback': requirejsFallback,
-            'checked_dirs': checked_dirs,
-            'file_name': file_name,
-            'found_path': file_path,
-            'dirs': ';\n'.join(','.join(os.listdir(os.path.join(root, file_path))) for root in checked_dirs)
-        }
         return ApiResponse(debug_info, 404).finalize_for(request)

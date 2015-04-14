@@ -1,9 +1,11 @@
 unversioned:
-    - ./main.js
-    - ./require.js
-    - ./json2.js
-    - ./require-text.js
-    - /img/
+    #- ^[\./]{0,2}main.js
+    - ^[\./]{0,2}require.js
+    - ^[\./]{0,2}json2.js
+    - ^[\./]{0,2}require-text.js
+    - ^/img/
+    - ^/requirejs/plugins/
+    - ^.*/requirejs-plugins/
 collect:
     /requirejs-plugins/: lib:requirejs/plugins/
 staging:

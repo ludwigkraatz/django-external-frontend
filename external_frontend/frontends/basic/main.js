@@ -1,8 +1,9 @@
 require.config({
+    baseUrl: window.frontend_config.statics_url,
     paths: {
-        config: 'config.json',
-        text: 'require-text',
-        json: "json2",
+        config: window.frontend_config.config_url,
+        text: 'js/require-text',
+        json: "js/json2",
 
 
         "fancyPlugin": "js/libs/requirejs/plugins/fancy-frontend/plugin/1/plugin",
@@ -20,6 +21,9 @@ require.config({
         "prefix": "{module}",
         "module": {
           "path": "{module}"
+        },
+        "version": {
+          "root": "forever/"
         },
         "plugin": {
           "path": "/libs/requirejs/plugins/{container}/{plugin}",

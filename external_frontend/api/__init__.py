@@ -23,7 +23,7 @@ if settings.STATICS_OVER_API:
         # TODO
         frontend_endpoint = frontend_settings.FRONTEND.ENDPOINT or get_default_endpoint(name)
         frontends[name] = frontend_endpoint
-        static = frontend_endpoint.register_endpoint("static", view_name='static-root', view=EndpointView)
+        static = frontend_endpoint.register_endpoint("statics", view_name='static-root', view=EndpointView)
 
         static.register_selector(
             "file",
@@ -31,7 +31,8 @@ if settings.STATICS_OVER_API:
             view=StaticsServer,
             view_name='statics',
             view_config={
-                'frontend': frontend_settings.FRONTEND
+                'frontend': frontend_settings.FRONTEND,
+                'platform': frontend_settings.PLATFORM_COLLECTION['web']
             },
             apply_slash=False
         )
