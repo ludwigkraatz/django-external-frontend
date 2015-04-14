@@ -5,17 +5,18 @@ from ...utils.stdout import WrappedOutput
 from functools import partial
 from optparse import make_option
 import time
+from django.core.management import call_command
+from ...settings import settings
+from app_settings.utils import override_app_settings
 
+default_storage = {
+    'CLASS': 'external_frontend.storage.VirtualStorage',
+}
 
 class Command(BaseCommand):
     args = ''
-    help = 'builds frontend and watches for changes'
+    help = 'debugs frontend with running backend via "runserver *args"'
     option_list = BaseCommand.option_list + (
-        make_option('--watch',
-                    action='store_true',
-                    dest='watch',
-                    default=False,
-                    help='watch frontend for changes'),
         make_option('--platform',
                     action='store',
                     dest='platform',
@@ -26,11 +27,6 @@ class Command(BaseCommand):
                     dest='frontend',
                     default=None,
                     help='which specific plattform shall be built'),
-        make_option('--dry-run',
-                    action='store_true',
-                    dest='dry',
-                    default=False,
-                    help='just output what would have been done'),
         make_option('--no-cache',
                     action='store_true',
                     dest='ignore_cache',
@@ -38,11 +34,12 @@ class Command(BaseCommand):
                     help='just output what would have been done'),
     )
 
+    @override_app_settings(settings, {
+        'STORAGE_COLLECTION': {'default': default_storage}
+    })
     def handle(self, *args, **options):
         output_level = None#1  # TODO: arg
         stdout = WrappedOutput(self.stdout, self.stderr, output_level=output_level)
-        watch = options['watch']
-        dry = options['dry']
         selected_frontend = options.get('frontend')
         selected_platform = options.get('platform')
 
@@ -50,19 +47,17 @@ class Command(BaseCommand):
             stop_watching = build(
                 frontends=selected_frontend,
                 platforms=selected_platform,
-                watch=watch,
-                dry=dry,
                 ignore_cache=options.get('ignore_cache'),
-                log=stdout)
+                watch=True,
+                log=stdout
+            )
         except BuildError, e:
             raise CommandError("couldn't build frontend. Error: %s" % str(e))
 
-        if watch:
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                stdout.write('')  # new line after KeyboardInterrupt
-                stop_watching()
-
-        stdout.write('build_frontend terminated.')
+        serve_options = {}
+        for key, value in options.items():
+            if key in ['frontend', 'platform']:
+                serve_options[key] = value
+        call_command('runserver', *args)
+        call_command('serve_frontend', **serve_options)
+        stop_watching()

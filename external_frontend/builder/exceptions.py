@@ -1,0 +1,4 @@
+
+
+class BuildError(Exception):
+    pass
