@@ -30,6 +30,7 @@ config = {
             'PLATFORM': None,
             'PLATFORMS': [],
             'API_SERVED_STORAGE': None,
+            'STAGE': None,
         },
         'FRONTEND_COLLECTION': {},
         'WORDING_HANDLER': {
@@ -83,15 +84,14 @@ config = {
             'ENDPOINT': '',
             'PLATFORM': 'web',
             'API_SERVED_STORAGE': 'default'
+            'STAGE': 'development' if django_settings.DEBUG else 'production',
         },
         'WORDINGS': {
             'NAME': 'default',
             'BACKEND': 'external_frontend.wordings.DBWordingsBackend'
         },
         'STORAGE': {
-            'NAME': 'default',
-            'CLASS': 'external_frontend.storage.DevelopmentStorage',
-            'CLEAN_BUILD': True
+            'REQUIRES_VERSIONED': False
         },
         'BUILDER': {
             'SRC_NAME': '',

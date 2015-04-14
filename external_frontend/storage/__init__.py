@@ -3,6 +3,7 @@
 import os
 import shutil
 from ..settings import settings as externalFrontendSettings
+from ..models import SourceVersion
 
 
 class Storage(object):
@@ -12,6 +13,7 @@ class Storage(object):
 
     def __init__(self, settings):
         self.clean_build = settings.CLEAN_BUILD
+        self.requires_versioned = settings.REQUIRES_VERSIONED
 
     class PathNotFound(Exception):
         pass
@@ -35,15 +37,19 @@ class Storage(object):
     def get(self, path):
         raise NotImplemented('subclass needs to specify behaviour')
 
-    def get_current_verion(self, path_template):
-        pass
+    def get_version(self, orig_path, content, platform, frontend, **kwargs):
+        if frontend.STAGE == 'development' and not self.requires_versioned:
+            return 0
 
-    def solve_path(self, path_template, content):
-        current_version = 1
-        if True:  # TODO: implement / settings.DEBUG:
-            return path_template.format(version=current_version)
+        identifier = '{frontend}.{platform}.{path}'.format(
+            frontend=frontend.NAME,
+            platform=platform.NAME,
+            package='',
+            path=orig_path
+        )
 
-        path = os.path.join(self.root, path_template)
+        source, created = SourceVersion.objects.get_or_create(content=content, identifier=identifier)
+        return source.version
 
         # TODO: hash content and compare
         with open(path, 'r') as current_content:
