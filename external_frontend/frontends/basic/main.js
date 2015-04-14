@@ -6,7 +6,7 @@ require.config({
         json: "js/json2",
 
 
-        "fancyPlugin": "js/libs/requirejs/plugins/fancy-frontend/plugin/1/plugin",
+        "fancyPlugin": window.frontend_config.plugin_url,
         /*"text": "libs/requirejs/plugins/text/1/text",
         "json": "libs/json2/1/json2",*/
 
@@ -69,7 +69,7 @@ require.config({
 // which is propagated to the user, saying the version is corrupt
 // note: maybe do this within (the core) app
 
-require(['text!config'], function(config){
+require(['text!config', 'fancyPlugin'], function(config){
     function proceed(frontendConfig){
         require.config(frontendConfig.requirejs);
 

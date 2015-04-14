@@ -16,7 +16,8 @@ class Platform(object):
             <script>
                 window.frontend_config = {{
                     statics_url: '{FRONTEND_STATICS}',
-                    config_url: '{CONFIG_PATH}'
+                    config_url: '{CONFIG_PATH}',
+                    plugin_url: '{PLUGIN_PATH}'
                 }};
             </script>
             {BEFORE_MAIN}
@@ -66,6 +67,7 @@ class Platform(object):
             MAIN_PATH = 'forever/js/main/0/main.js',  # TODO: get path from builder
             REQUIRE_PATH = 'js/require.js',
             CONFIG_PATH = 'forever/js/config.json/0/config.json',  # TODO: get path from builder
+            PLUGIN_PATH = 'forever/js/libs/requirejs/plugins/fancy-frontend/plugin/0/plugin',  # TODO: get path from builder
             FRONTEND_STATICS = self.get_static_url(**config),
             FRONTEND_NAME = builder.name,
             WIDGET_NAME = builder.name,
