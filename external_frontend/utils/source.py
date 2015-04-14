@@ -1,4 +1,5 @@
 import os
+import re
 
 
 class NotExecuted(object):
@@ -9,7 +10,7 @@ class NotExecutedError(NotImplementedError):
     pass
 
 
-def export_folder(self, handler, cache_dir):
+def export_folder(self, handler, cache_dir, filter):
     current_source = handler
     current_cache_dir = cache_dir
     for current_root, dirnames, filenames in os.walk(current_source):
@@ -17,6 +18,8 @@ def export_folder(self, handler, cache_dir):
 
         for path in filenames:
             if path.startswith('.') or ('.' + os.path.sep) in relative_path or (os.path.sep + '.') in relative_path:
+                continue
+            if filter and not re.compile(filter).match(path):
                 continue
             path = os.path.join(relative_path, path)
             dir_path = os.path.dirname(path)
@@ -52,10 +55,10 @@ def init_git_handler(self, source, version_cache, log):
             if log:
                 log.write('cloning from', source)
         else:
-            if log:
-                log.write('updating from', source)
             repo = Repo(cache)
             if update_from_origin:
+                if log:
+                    log.write('updating from', source)
                 repo.git.execute(['git', 'fetch'])
 
         if commit:
@@ -92,7 +95,8 @@ def init_git_handler(self, source, version_cache, log):
     return repo
 
 wrappedGitMethodMap = {
-    'export': lambda self, repo, destination: repo.index.checkout(
+    'export': lambda self, repo, destination, filter: repo.index.checkout(
+        filter.replace('^', '').replace('$', '') if filter else filter,
         force=True,
         prefix=os.path.realpath(destination) + os.path.sep
     ),
@@ -150,10 +154,10 @@ class WrappedSource(str):
     def install(self, log=None):
         return False
 
-    def export(self, destination, log=None):
+    def export(self, destination, log=None, filter=None):
         if self.handler is None:
             self.handler = self.initHandler(self.source, self.cache, log=log)
-        return self.execute_method('export', self.handler, destination, log=log)
+        return self.execute_method('export', self.handler, destination, filter, log=log)
 
     def initHandler(self, source, version_cache, log=None):
         if version_cache and not os.path.exists(version_cache):
@@ -170,6 +174,9 @@ class WrappedSource(str):
         return ret
 
     def execute_method(self, method, *args, **kwargs):
+        log = kwargs.get('log', None)
+        if log:
+            log.write('executing', method, *args, **kwargs)
         force_execution = kwargs.pop('force_execution', False)
         if method in self.method_map:
             try:
