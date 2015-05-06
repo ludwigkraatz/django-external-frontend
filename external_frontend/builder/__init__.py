@@ -47,6 +47,9 @@ def build(frontends=None, platforms=None, watch=False, dry=False, log=None, igno
     for name, frontend in settings.FRONTEND_COLLECTION.items():
         if selected_frontend != 'all' and frontend.NAME not in selected_frontend:
             continue
+        if frontend.ACTIVE is False:
+            continue
+
         started_platforms = []
         try:
             if not frontend.BUILDER:

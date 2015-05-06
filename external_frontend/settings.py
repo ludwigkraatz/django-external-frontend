@@ -22,6 +22,7 @@ config = {
         'FILES_FRONTEND_POSTFIX': None,
         'FRONTEND': {
             'NAME': None,
+            'ACTIVE': None,
             'PREFIX': None,  # used as root folder in storage as well as in statics server name
             #'STORAGE_METHOD': None,
             'WORDING_HANDLER': None,
@@ -87,6 +88,7 @@ config = {
             'WORDING_HANDLER': 'default',
             'ENDPOINT': '',
             'PLATFORM': 'web',
+            'ACTIVE': True,
             'BACKEND_HOST': '',
             'API_SERVED_STORAGE': 'default',
             'STAGE': 'development' if django_settings.DEBUG else 'production',
