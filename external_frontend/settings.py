@@ -99,6 +99,7 @@ config = {
         },
         'STORAGE': {
             #'NAME': 'default',,
+            'ROOT': django_settings.STATIC_ROOT,
             'REQUIRES_VERSIONED': False
         },
         'STORAGE_COLLECTION': {

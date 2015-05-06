@@ -1,4 +1,5 @@
 import os
+import shutil
 import re
 
 
@@ -19,9 +20,9 @@ def export_folder(self, handler, cache_dir, filter):
         for path in filenames:
             if path.startswith('.') or ('.' + os.path.sep) in relative_path or (os.path.sep + '.') in relative_path:
                 continue
+            path = os.path.join(relative_path, path)
             if filter and not re.compile(filter).match(path):
                 continue
-            path = os.path.join(relative_path, path)
             dir_path = os.path.dirname(path)
             if not os.path.exists(os.path.join(current_cache_dir, dir_path)):
                 os.makedirs(os.path.join(current_cache_dir, dir_path))

@@ -25,7 +25,7 @@ def export():
 
 
 class Web(Platform):
-    root_sources = '^.*ionic\.project'
+    root_sources = '^(.*ionic\.project|package\.json|config\.xml)'
     package_json = """{{
   "name": "{FRONTEND_NAME}",
   "version": "{FRONTEND_VERION}",
@@ -71,16 +71,16 @@ class Web(Platform):
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
     """
 
-    def generate_build_path(self, path, build_path):
-        build_path = super(Web, self).generate_build_path(path, build_path)
+    def patch_path(self, path, *args, **config):
+        build_path = path
         if build_path and not self.is_root_source(path):
-            build_path = 'www' + os.path.sep + build_path
+            build_path = os.path.join('www', build_path)
         return build_path
 
     def get_template_context(self, builder, **config):
         context = {}
         context['CORDOVA_PATH'] = 'cordova.js'
-        context['IONIC_PATH'] = 'forever/js/libs/ionic/ionic/0/ionic.js'
+        context['IONIC_PATH'] = builder.path_with_version('js/libs/ionic/ionic.js', **config)
         return super(Web, self).get_template_context(builder, context, **config)
 
     def compile(self, builder, queue, **compile_config):

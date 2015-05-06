@@ -29,7 +29,7 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
             return path
 
         def on_created(self, event):
-            if not event.is_directory and not (os.path.sep + '.') in event.src_path:
+            if not event.is_directory:
                 with open(event.src_path, 'r') as content:
                     path = self.prepare_path(event.src_path)
                     log.write("Created: " + path)
@@ -44,7 +44,7 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
                         )
 
         def on_deleted(self, event):
-            if not event.is_directory and not (os.path.sep + '.') in event.src_path:
+            if not event.is_directory:
                 path = self.prepare_path(event.src_path)
                 log.write("Removed: " + path)
                 builder.remove(
@@ -57,7 +57,7 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
                 )
 
         def on_moved(self, event):
-            if not event.is_directory and not (os.path.sep + '.') in event.src_path:
+            if not event.is_directory:
                 if (os.path.sep + '.') in event.dest_path:
                     path = self.prepare_path(event.dest_path)
                     log.write("Removed: " + path)
@@ -86,7 +86,7 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
                         )
 
         def on_modified(self, event):
-            if not event.is_directory and not (os.path.sep + '.') in event.src_path:
+            if not event.is_directory:
                 with open(event.src_path, 'r') as content:
                     path = self.prepare_path(event.src_path)
                     log.write("Modified: " + path)
@@ -115,6 +115,7 @@ class Builder(object):
         self.type = settings.TYPE
         self.filter = settings.FILTER
         self.exclude = settings.EXCLUDE
+        self.version_root = 'forever'
         self.supported_platforms = settings.SUPPORTED_PLATFORMS
 
         settings_cache_root = externalFrontendSettings.CACHE_ROOT
@@ -134,6 +135,7 @@ class Builder(object):
         self.source_versions = {}
         self.css_vars = {}
         self.css_config = SortedDict()
+        self.css_config['consts.scss'] = ""  # this file is implicitly provided by compiler
 
         # default
         self.config = {
@@ -170,7 +172,6 @@ class Builder(object):
 
     def pre_build(self, **config):
         self.compiler_queues = SortedDict((
-            ('config', SortedDict({None: SortedDict()})),
             ('js-config', SortedDict({None: SortedDict()})),
             ('css-config', SortedDict({None: SortedDict()})),
             ('sass', SortedDict({None: SortedDict()})),
@@ -179,6 +180,7 @@ class Builder(object):
             #('img', SortedDict({None: SortedDict()})),
             ('js', SortedDict({None: SortedDict()})),
             #('html', SortedDict({None: SortedDict()})),
+            ('config', SortedDict({None: SortedDict()})),
             ('platform', SortedDict({None: SortedDict()})),
         ))
 
@@ -322,12 +324,22 @@ class Builder(object):
     def get_static_url(self, **config):
         return config['platform'].get_static_url(**config)
 
-    def generate_build_path(self, orig_path):
+    def path_with_version(self, path_template, **config):
+        path = path_template
+        current_version = self.get_versions(**config).get(path, -1)
+
+        if current_version != -1:
+            path = self.patch_path_with_version_template(path)
+            return self.patch_path_with_version(path, current_version)
+        return path
+
+    def generate_build_path(self, orig_path, unversioned=None):
         built_root = '.'
         collected = False
         ignore = False
         path = orig_path
-        unversioned = None
+        if not path:
+            return path
 
         if self.filter and not re.compile(self.filter).match(path):
             ignore = True
@@ -429,19 +441,10 @@ class Builder(object):
                             unversioned = True
 
             if not unversioned and (self.get_config('unversioned', None) is None or path not in self.get_config('unversioned')):
-                paths = path.split(os.path.sep)
-                file_parts = paths[-1].split('.')
-                if file_parts[-1] == 'js':
-                    file_name = '.'.join(file_parts[:-1])
-                else:
-                    file_name = '.'.join(file_parts)
-                path = os.path.join(
-                    os.path.sep.join(paths[:-1]) or '.',
-                    file_name+os.path.sep+'{version}',
-                    paths[-1]
-                )
+                #version = config.get('')
+                path = self.patch_path_with_version_template(path, module=built_root)
             else:
-                path = path
+                path = os.path.join(built_root, path)
 
         if ignore:
             return None
@@ -449,12 +452,33 @@ class Builder(object):
             return 0
         else:
             path = path.replace(self.src_name, self.name)
-            path = os.path.join(built_root, path)
             if path.find(os.path.sep) <= 0:
                 path = '.' + os.path.sep + path
-            if not unversioned:  # TODO: setting
-                path = '{version_root}' + os.path.sep + path
-            return path
+            return path.replace(os.path.sep + '.' + os.path.sep, os.path.sep)
+
+    def patch_path_with_version_template(self, path, module='.'):
+        paths = path.split(os.path.sep)
+        file_parts = paths[-1].split('.')
+        if file_parts[-1] == 'js':
+            file_name = '.'.join(file_parts[:-1])
+        else:
+            file_name = '.'.join(file_parts)
+        path = os.path.join(
+            '{version_root}',
+            module,
+            os.path.sep.join(paths[:-1]) or '.',
+            file_name,
+            '{version}',
+            paths[-1]
+        ).replace(os.path.sep + '.' + os.path.sep, os.path.sep)
+        return path
+
+    def patch_path_with_version(self, path_template, current_version):
+        if current_version != -1:
+            path_template = path_template.format(version=current_version, version_root=self.version_root)
+        else:
+            path_template = os.path.normpath(path_template.format(version='..', version_root='.'))
+        return path_template
 
     def get_build_path(self, path, **config):
         """
@@ -577,7 +601,10 @@ class Builder(object):
                 return True
             for storage in storages:
                 if content is None:
-                    return storage.remove(new_path, log=log.with_indent(new_path), current_builder=self, main_builder=config['main_builder'], platform=config['platform'], orig_path=path, source=getattr(self, 'src', None))
+                    return storage.remove(new_path, log=log.with_indent(new_path), current_builder=self, main_builder=config['main_builder'], platform=config['platform'],
+                                          orig_path=path,
+                                          frontend_path=self.patch_path_with_version(new_path, -1),
+                                          source=getattr(self, 'src', None))
                 else:
                     return storage.update(
                         new_path,
@@ -588,6 +615,7 @@ class Builder(object):
                         frontend=config['frontend'],
                         platform=config['platform'],
                         orig_path=path,
+                        frontend_path=self.patch_path_with_version(new_path, -1),
                         source=getattr(self, 'src', None)
                     )
         else:
@@ -607,7 +635,7 @@ class Builder(object):
             self.update_configuration(content=content, **config)
             return False
         elif compile_as == 'css-config':
-            import scss
+            from . import scss
             scss.config.PROJECT_ROOT = self.get_cache_dir_current(**config)
             scss.config.DEBUG = self.debug
             _scss_opts = {
@@ -619,6 +647,10 @@ class Builder(object):
             #if content is False or len(self.css_config):
             #    for path, content in self.css_config.items()[::-1]:
             #        content_list.insert(0, path, content)
+
+            prefix = self.name
+            self.css_vars['$frontend-prefix'] = scss.types.String.unquoted((prefix + '-') if prefix else '')
+            self.css_vars['$image-root'] = scss.types.String.unquoted(self.static_img_root_url)
 
             _scss = scss.Scss(
                 scss_opts=_scss_opts,
@@ -638,24 +670,42 @@ class Builder(object):
                 content = _scss.compile(content)
 
             self.css_vars = _scss.get_scss_vars()
-            prefix = self.name
 
-            self.css_vars['$frontend-prefix'] = scss.types.String.unquoted((prefix + '-') if prefix else '')
-            self.css_vars['$image-root'] = scss.types.String.unquoted(self.static_img_root_url)
+            ## TODO: doing this twice is ugly
+            #self.css_vars['$frontend-prefix'] = scss.types.String.unquoted((prefix + '-') if prefix else '')
+            #self.css_vars['$image-root'] = scss.types.String.unquoted(self.static_img_root_url)
 
+            # TODO: different. this is needed, because when watching, we want the design.scss to be
+            # just what is written when recompiling
+            name = os.path.join(self.get_compile_dir(**config), 'css', 'design.scss')
+            if os.path.exists(name):
+                os.unlink
+            self.css_config['design.scss'] = ''
+            as_main_design = True
             for content_path in content_list:
-                if not content_path.endswith('consts.scss'):
-                    self.css_config[content_path.split('/')[-1]] = content_list[content_path]
-
                 parts = content_path.split(os.path.sep)
+                if parts[1] != 'consts.scss':  # consts are handled as self.css_vars
+                    if as_main_design:
+                        self.css_config[parts[-1]] += content_list[content_path] + '\n'
+                    self.css_config[content_path] = content_list[content_path]
+
                 if not parts[1].startswith('consts'):  # and parts[0] == self.name:
-                    with open(os.path.join(self.get_compile_dir(**config), 'css', parts[1]), 'a+') as file:
+                    compile_file = os.path.join(self.get_compile_dir(**config), 'css', content_path)
+                    if not os.path.exists(os.path.dirname(compile_file)):
+                        os.makedirs(os.path.dirname(compile_file))
+                    with open(compile_file, 'a+') as file:
                         file.write(content_list[content_path])
+                        file.write('\n')
+                    if as_main_design:
+                        compile_file = os.path.join(self.get_compile_dir(**config), 'css', parts[1])
+                        with open(compile_file, 'a+') as file:
+                            file.write(content_list[content_path])
+                            file.write('\n')
 
             config['log'].write('loaded', str(len(self.css_vars.keys())), 'vars from', str(len(content_list)), 'files')
             return False  # content
         elif compile_as == 'scss':
-            import scss
+            from . import scss
             scss.config.PROJECT_ROOT = self.get_cache_dir_current(**config)
             scss.config.DEBUG = self.debug
             _scss_vars = self.css_vars
@@ -929,15 +979,16 @@ class Builder(object):
         return config
 
     def get_versions(self, platform, **config):
-        return self.source_versions.get(platform.NAME, {})
+        return self.source_versions.get(platform.NAME, {}).get(config.get('main_builder').name, {})
 
-    def set_version(self, builder, path, version, platform, **config):
+    def set_version(self, frontend_path, path_template, builder, path, version, platform, **config):
         if platform.NAME not in self.source_versions:
             self.source_versions[platform.NAME] = {}
         if builder.name not in self.source_versions[platform.NAME]:
             self.source_versions[platform.NAME][builder.name] = {}
 
-        self.source_versions[platform.NAME][builder.name][path] = version
+        self.source_versions[platform.NAME][builder.name][frontend_path] = version
+        return self.patch_path_with_version(path_template, version)
 
 
 class StaticsBuilder(Builder):
@@ -953,8 +1004,9 @@ class StaticsBuilder(Builder):
         started += super(StaticsBuilder, self).init_observers(**config)
 
         main_builder = config.get('main_builder', None)
+        platform = config.get('platform', None)
 
-        if main_builder in self.observers_watcher:
+        if (main_builder, platform) in self.observers_watcher:
             return started
 
         for folder in self.found_folders:

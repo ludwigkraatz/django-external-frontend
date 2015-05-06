@@ -3,6 +3,7 @@ import re
 from ..settings import settings as externalFrontendSettings
 from django.conf import settings
 from introspective_api.reverse import reverse_nested
+import json
 
 
 class Platform(object):
@@ -16,8 +17,7 @@ class Platform(object):
             <script>
                 window.frontend_config = {{
                     statics_url: '{FRONTEND_STATICS}',
-                    config_url: '{CONFIG_PATH}',
-                    plugin_url: '{PLUGIN_PATH}'
+                    paths: {PATHS}
                 }};
             </script>
             {BEFORE_MAIN}
@@ -63,11 +63,13 @@ class Platform(object):
         return static_root_url
 
     def get_template_context(self, builder, additional_context=None, **config):
+        paths = {}
+        paths['fancyPlugin'] = builder.path_with_version('js/libs/requirejs/plugins/fancy-frontend/plugin.js', **config)[:-3]
+        paths['config'] = builder.path_with_version('js/config.json', **config)
         context = dict(
-            MAIN_PATH = 'forever/js/main/0/main.js',  # TODO: get path from builder
+            MAIN_PATH = builder.path_with_version('js/main.js', **config),
             REQUIRE_PATH = 'js/require.js',
-            CONFIG_PATH = 'forever/js/config.json/0/config.json',  # TODO: get path from builder
-            PLUGIN_PATH = 'forever/js/libs/requirejs/plugins/fancy-frontend/plugin/0/plugin',  # TODO: get path from builder
+            PATHS = json.dumps(paths),
             FRONTEND_STATICS = self.get_static_url(**config),
             FRONTEND_NAME = builder.name,
             WIDGET_NAME = builder.name,

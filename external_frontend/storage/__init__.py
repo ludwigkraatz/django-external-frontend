@@ -52,7 +52,7 @@ class Storage(object):
 
     def get_version(self, orig_path, content, platform, frontend, **kwargs):
         if frontend.STAGE == 'development' and not self.requires_versioned:
-            return 0
+            return -1
 
         identifier = '{frontend}.{platform}.{path}'.format(
             frontend=frontend.NAME,
@@ -62,13 +62,12 @@ class Storage(object):
         )
 
         source, created = SourceVersion.objects.get_or_create(content=content, identifier=identifier)
-        return source.version
+        return str(source.version)
 
-    def solve_path(self, path_template, content, frontend, platform, orig_path=None, current_builder=None, main_builder=None, patch_platform=True, **kwargs):
+    def solve_path(self, path_template, content, frontend, platform, frontend_path, orig_path=None, current_builder=None, main_builder=None, patch_platform=True, **kwargs):
         current_version = self.get_version(orig_path=orig_path, content=content, platform=platform, frontend=frontend, **kwargs)
-        main_builder.set_version(builder=current_builder, path=orig_path, version=current_version, frontend=frontend, platform=platform)
+        path_template = main_builder.set_version(frontend_path=frontend_path, path_template=path_template, builder=main_builder, path=orig_path, version=current_version, frontend=frontend, platform=platform)
 
-        path_template = path_template.format(version=current_version, version_root='forever')
         if platform and patch_platform:
             path_template = platform.patch_path(path_template, frontend=frontend, platform=platform, **kwargs)
 

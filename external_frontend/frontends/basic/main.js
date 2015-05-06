@@ -1,19 +1,20 @@
-require.config({
-    baseUrl: window.frontend_config.statics_url,
-    paths: {
-        config: window.frontend_config.config_url,
+paths_config = {
         text: 'js/require-text',
         json: "js/json2",
-
-
-        "fancyPlugin": window.frontend_config.plugin_url,
         /*"text": "libs/requirejs/plugins/text/1/text",
         "json": "libs/json2/1/json2",*/
 
         "jquery": "fancyPlugin!lib:jquery/jquery",
         "jquery-ui": "fancyPlugin!lib:jquery/jquery-ui",
         "hawk": "fancyPlugin!lib:hawk/hawk",
-    },
+    }
+for (var path in window.frontend_config.paths || {}) {
+    paths_config[path] = window.frontend_config.paths[path]
+}
+
+require.config({
+    baseUrl: window.frontend_config.statics_url,
+    paths: paths_config,
     "shim": {
         "jquery-ui": ["fancyPlugin!jquery"]
     },
@@ -69,14 +70,15 @@ require.config({
 // which is propagated to the user, saying the version is corrupt
 // note: maybe do this within (the core) app
 
-require(['text!config', 'fancyPlugin'], function(config){
+require(['text!config'], function(config){
     function proceed(frontendConfig){
         require.config(frontendConfig.requirejs);
 
         for (key in frontendConfig.start.frontends) {
             var app_name = frontendConfig.start.frontends[key],
                 instanceConfig = frontendConfig.frontends[app_name];
-            require( ['fancyPlugin!app:'+app_name], function(app) {
+            // require hawk here, because in dependencies it might not be loaded with fancyPlugin.
+            require( ['fancyPlugin!hawk', 'fancyPlugin!app:'+app_name], function(hawk, app) {
                 new app(instanceConfig);
             });
         }
