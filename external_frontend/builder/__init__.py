@@ -22,20 +22,6 @@ def build_platform(frontend, platform, log, watch=False, dry=None, settings=sett
             frontend_stdout.write('builder "%s" couldnt succeed' % main_builder.NAME)
 
 
-def prepare_storages(log, settings=settings):
-    storages = {}
-    for name, platform in settings.PLATFORM_COLLECTION.items():
-        for storage in platform.USED_STORAGE:
-            storages[storage.NAME] = storage
-
-    for storage in storages.values():
-        storage_stdout = log.with_indent('Storage: "%s"' % storage.NAME)
-        storage.pre_build(
-            log=storage_stdout
-        )
-    return storages
-
-
 def stop_watching(started, log=None, settings=settings):
     for frontend, platforms in started:
         main_builder = frontend.BUILDER
@@ -48,8 +34,8 @@ def stop_watching(started, log=None, settings=settings):
 
 def build(frontends=None, platforms=None, watch=False, dry=False, log=None, ignore_cache=False, settings=settings):
     started = []
+    handled_storages = []
     pre_build_log = log.with_indent('pre build')
-    storages = prepare_storages(log=pre_build_log, settings=settings)
     selected_frontend = frontends or 'all'
     selected_platform = platforms or 'all'
     if selected_frontend != 'all' and not isinstance(selected_frontend, (tuple, list)):
@@ -74,6 +60,14 @@ def build(frontends=None, platforms=None, watch=False, dry=False, log=None, igno
             if selected_platform != 'all' and platform.NAME not in selected_platform:
                 continue
 
+            for storage in platform.USED_STORAGE:
+                if storage.NAME in handled_storages:
+                    continue
+                handled_storages.append(storage.NAME)
+                storage_stdout = log.with_indent('Storage: "%s"' % storage.NAME)
+                storage.pre_build(
+                    log=storage_stdout
+                )
             build_platform(frontend, platform, log=build_log, watch=watch, dry=dry, settings=settings)
             started_platforms.append(platform)
         started.append((frontend, started_platforms))
