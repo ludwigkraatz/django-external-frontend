@@ -161,11 +161,17 @@ config = {
                 'DEPENDS_ON': ['normalize', 'introspective_api'],
                 'PROTECTED': True
             },
+            'SVGInjector': {
+                'NAME': 'SVGInjector',
+                'TYPE': 'lib',
+                'FILTER': '^dist',
+                'SRC': 'https://github.com/iconic/SVGInjector.git@e84f9b47eadb501e68a4d0d5b6593935e8d25c19',
+            },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@36c8917faf3fa99d8866802baf630cf88889aca9',
+                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@be9cc3b120aec47d6c5da9b77f97e6308cecc55c',
                 'FILTER': '^fancy-frontend/',
-                'DEPENDS_ON': ['basic-frontend'],
+                'DEPENDS_ON': ['basic-frontend', 'SVGInjector'],
                 'TYPE': 'app',
                 'PROTECTED': True
             },
@@ -173,7 +179,7 @@ config = {
                 'NAME': 'fancy-angular',
                 #'FILTER': '^fancy-angular/',
                 #'SRC_NAME': 'fancy_angular',
-                'SRC': 'https://github.com/suncircle/fancy-angular.git@0c2b3fb786cd3554330e9127c30b18e12e617ac1',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git@6418a64cf79e7857dab08322fa47ff63c406366f',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },
