@@ -111,7 +111,7 @@ config = {
             'ionic': {
                 'NAME': 'ionic',
                 'CLASS': 'external_frontend.storage.StaticsStorage',
-                'CLEAN_BUILD': True,
+                'CLEAN_BUILD': False,  # TODO: deleting files without build dirs
                 'REQUIRES_VERSIONED': True  # ionic view app needs versioning.
             }
         },

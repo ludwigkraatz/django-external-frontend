@@ -50,8 +50,14 @@ class Storage(object):
     def get(self, path, *args, **kwargs):
         raise NotImplemented('subclass needs to specify behaviour')
 
+    def is_versioned(self, frontend, **kwargs):
+        return not (frontend.STAGE == 'development' and not self.requires_versioned)
+
     def get_version(self, orig_path, content, platform, frontend, **kwargs):
-        if frontend.STAGE == 'development' and not self.requires_versioned:
+        if not self.is_versioned(frontend=frontend):
+            return -1
+        if orig_path is None:
+            # TODO
             return -1
 
         identifier = '{frontend}.{platform}.{path}'.format(
@@ -96,6 +102,7 @@ class FileStorage(Storage):
             shutil.rmtree(self.root)
 
     def update(self, path, content, log=None, orig_path=None, platform=None, source=None, **kwargs):
+        is_versioned_path = '{version_root}' in path  # TODO: do somehow main_builder.test()
         path = os.path.join(self.root, self.solve_path(path, content, orig_path=orig_path, platform=platform, **kwargs))
         #log.write('absolute path:' + path)
 
@@ -103,6 +110,11 @@ class FileStorage(Storage):
         if not os.path.exists(dirs):
             os.makedirs(dirs)
             log.write('dirs created')
+
+        elif is_versioned_path and os.path.exists(path):
+            if self.get_version(orig_path, content, platform=platform, **kwargs) > 0:
+                log.write('used existing file')
+                return
 
         with open(path, 'w') as new_file:
             new_file.write(content)
