@@ -982,12 +982,13 @@ class Builder(object):
         return self.source_versions.get(platform.NAME, {}).get(config.get('main_builder').name, {})
 
     def set_version(self, frontend_path, path_template, builder, path, version, platform, **config):
-        if platform.NAME not in self.source_versions:
-            self.source_versions[platform.NAME] = {}
-        if builder.name not in self.source_versions[platform.NAME]:
-            self.source_versions[platform.NAME][builder.name] = {}
+        if version != -1:
+            if platform.NAME not in self.source_versions:
+                self.source_versions[platform.NAME] = {}
+            if builder.name not in self.source_versions[platform.NAME]:
+                self.source_versions[platform.NAME][builder.name] = {}
+            self.source_versions[platform.NAME][builder.name][frontend_path] = version
 
-        self.source_versions[platform.NAME][builder.name][frontend_path] = version
         return self.patch_path_with_version(path_template, version)
 
 
