@@ -158,6 +158,10 @@ class WrappedSource(str):
     def export(self, destination, log=None, filter=None):
         if self.handler is None:
             self.handler = self.initHandler(self.source, self.cache, log=log)
+        # TODO: exporting sources to clean dir - to make sure removed files dont exist in exported folder anymore
+        #if os.path.exists(destination):
+        #   shutil.rmtree(destination)
+        #os.makedirs(destination)
         return self.execute_method('export', self.handler, destination, filter, log=log)
 
     def initHandler(self, source, version_cache, log=None):
