@@ -33,6 +33,7 @@ config = {
             'API_SERVED_STORAGE': None,
             'BACKEND_HOST': None,
             'STAGE': None,
+            'AUTO_LOGIN': None
         },
         'FRONTEND_COLLECTION': {},
         'WORDING_HANDLER': {
@@ -92,6 +93,7 @@ config = {
             'BACKEND_HOST': '',
             'API_SERVED_STORAGE': 'default',
             'STAGE': 'development' if django_settings.DEBUG else 'production',
+            'AUTO_LOGIN': False
         },
         'WORDINGS': {
             'NAME': 'default',
@@ -158,7 +160,7 @@ config = {
             'basic-frontend': {
                 'NAME': 'basic-frontend',
                 'SRC': os.path.join(PROJECT_ROOT, 'frontends', 'basic'),
-                'DEPENDS_ON': ['normalize', 'introspective_api'],
+                'DEPENDS_ON': [],
                 'PROTECTED': True
             },
             'SVGInjector': {
@@ -169,17 +171,17 @@ config = {
             },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@be9cc3b120aec47d6c5da9b77f97e6308cecc55c',
-                'FILTER': '^fancy-frontend/',
-                'DEPENDS_ON': ['basic-frontend', 'SVGInjector'],
-                'TYPE': 'app',
+                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@8424c9f08277f73b86bfa6c15996d6d6aa3816d8',
+                #'FILTER': '^fancy-frontend/',
+                'DEPENDS_ON': ['normalize', 'SVGInjector', 'introspective_api'],
+                #'TYPE': 'app',
                 'PROTECTED': True
             },
             'fancy-angular': {
                 'NAME': 'fancy-angular',
                 #'FILTER': '^fancy-angular/',
                 #'SRC_NAME': 'fancy_angular',
-                'SRC': 'https://github.com/suncircle/fancy-angular.git@6418a64cf79e7857dab08322fa47ff63c406366f',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git@54f3966f1a511822d58f883c890fcd9ffb353e79',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },

@@ -30,42 +30,48 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
 
         def on_created(self, event):
             if not event.is_directory:
-                with open(event.src_path, 'r') as content:
-                    path = self.prepare_path(event.src_path)
-                    log.write("Created: " + path)
-                    builder.update(
+                path = self.prepare_path(event.src_path)
+                if (os.path.sep + '.') in path or (path.startswith('.') and not path.startswith('.' + os.path.sep)):
+                    log.write("ignoring watched: " + event.src_path, logging_level=log.DEBUG_LOG)
+                else:
+                    with open(event.src_path, 'r') as content:
+                        log.write("Created: " + path)
+                        builder.update(
+                            path=path,
+                            content=content.read(),
+                            storages=storages,
+                            log=log.with_indent(),
+                            main_builder=main_builder,
+                            platform=platform,
+                            frontend=frontend
+                            )
+
+        def on_deleted(self, event):
+            if not event.is_directory:
+                path = self.prepare_path(event.src_path)
+                if (os.path.sep + '.') in path or (path.startswith('.') and not path.startswith('.' + os.path.sep)):
+                    log.write("ignoring watched: " + event.src_path, logging_level=log.DEBUG_LOG)
+                else:
+                    log.write("Removed: " + path)
+                    builder.remove(
                         path=path,
-                        content=content.read(),
                         storages=storages,
                         log=log.with_indent(),
                         main_builder=main_builder,
                         platform=platform,
                         frontend=frontend
-                        )
-
-        def on_deleted(self, event):
-            if not event.is_directory:
-                path = self.prepare_path(event.src_path)
-                log.write("Removed: " + path)
-                builder.remove(
-                    path=path,
-                    storages=storages,
-                    log=log.with_indent(),
-                    main_builder=main_builder,
-                    platform=platform,
-                    frontend=frontend
-                )
+                    )
 
         def on_moved(self, event):
             if not event.is_directory:
-                if (os.path.sep + '.') in event.dest_path:
+                path = self.prepare_path(event.src_path)
+                dest_path = self.prepare_path(event.dest_path)
+                if (os.path.sep + '.') in path or (path.startswith('.') and not path.startswith('.' + os.path.sep)):
                     path = self.prepare_path(event.dest_path)
                     log.write("Removed: " + path)
                     builder.remove(path=path, storages=storages, log=log.with_indent(), main_builder=main_builder, platform=platform)
                 else:
                     with open(event.dest_path, 'r') as content:
-                        path = self.prepare_path(event.src_path)
-                        dest_path = self.prepare_path(event.dest_path)
                         log.write("Moved: " + path + ' to ' + dest_path)
                         builder.remove(
                             path=path,
@@ -87,18 +93,21 @@ def generate_handler(storages, builder, src, log, main_builder, frontend, platfo
 
         def on_modified(self, event):
             if not event.is_directory:
-                with open(event.src_path, 'r') as content:
-                    path = self.prepare_path(event.src_path)
-                    log.write("Modified: " + path)
-                    builder.update(
-                        path=path,
-                        content=content.read(),
-                        storages=storages,
-                        log=log.with_indent(),
-                        main_builder=main_builder,
-                        platform=platform,
-                        frontend=frontend
-                    )
+                path = self.prepare_path(event.src_path)
+                if (os.path.sep + '.') in path or (path.startswith('.') and not path.startswith('.' + os.path.sep)):
+                    log.write("ignored watched: " + event.src_path, logging_level=log.DEBUG_LOG)
+                else:
+                    with open(event.src_path, 'r') as content:
+                        log.write("Modified: " + path)
+                        builder.update(
+                            path=path,
+                            content=content.read(),
+                            storages=storages,
+                            log=log.with_indent(),
+                            main_builder=main_builder,
+                            platform=platform,
+                            frontend=frontend
+                        )
 
     return Handler()
 
@@ -185,16 +194,23 @@ class Builder(object):
         ))
 
     def clean(self, storages, log=None, **config):
+        for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
+            dependency.clean(storages, log=log, **config)
+
         compile_root = self.get_compile_dir(**config)
         if os.path.exists(compile_root):
             shutil.rmtree(compile_root)
         src_cache = self.get_cache_dir_src(storages=storages, log=log, **config)
-        for path in os.listdir(src_cache):
-            path = os.path.join(src_cache, path)
-            if not os.path.islink(path) and os.path.isdir(path):
-                shutil.rmtree(path)
-        for storage in storages:
-            storage.clean(log=log, frontend=config.get('main_builder').name, platform=config.get('platform'))
+        if os.path.exists(src_cache):
+            shutil.rmtree(src_cache)
+        #for path in os.listdir(src_cache):
+        #    path = os.path.join(src_cache, path)
+        #    if not os.path.islink(path) and os.path.isdir(path):
+        #        shutil.rmtree(path)
+
+        if config.get('main_builder') == self:
+            for storage in storages:
+                storage.clean(log=log, frontend=config.get('main_builder').name, platform=config.get('platform'))
 
     def collect(self, **config):
         for dependency in self.get_dependencies(config.get('main_builder'), config.get('platform')):
@@ -651,6 +667,7 @@ class Builder(object):
             prefix = self.name
             self.css_vars['$frontend-prefix'] = scss.types.String.unquoted((prefix + '-') if prefix else '')
             self.css_vars['$image-root'] = scss.types.String.unquoted(self.static_img_root_url)
+            self.css_vars['$css-root'] = scss.types.String.unquoted(self.static_css_root_url)
 
             _scss = scss.Scss(
                 scss_opts=_scss_opts,
@@ -917,7 +934,7 @@ class Builder(object):
 
         for app, app_config in self.get_config('apps', default={}).items():
             prefix = app_config.get('namespace', '')
-            defaults_namespace = self.get_config('requirejs', 'defaults', app, default=prefix)
+            defaults_namespace = self.get_config('apps', app, 'defaults_namespace', default=prefix)
             if not isinstance(app_config, dict):
                 app_config = {}
             apps = {}
@@ -931,14 +948,26 @@ class Builder(object):
                     'defaults_namespace': defaults_namespace
                 }
 
-            host = app_config.get('base_url', self.host_root_url)
+            host = app_config.get('base_url', self.host_root_url)  # TODO: get hostname & protocol from settings?
             if app == self.name:
                 config['start']['frontends'].append(app)
             config['frontends'][app] = {
                 'init': {
-                    'host': host,
-                    'content_host': self.static_content_root_url,
-                    'crossDomain': False
+                    'default_host': 'backend',
+                    'hosts': {
+                        'backend': {
+                            'host': host,
+                            'crossDomain': False
+                        },
+                        #'dynamic': {
+                        #    'host': host,
+                        #    'content_host': self.static_content_root_url,
+                        #    'crossDomain': False
+                        #},
+                        'static': {
+                            'host': self.static_content_root_url
+                        },
+                    }
                 },
                 'selector': '[load-' + app+']',
                 'cssConfig': {
@@ -969,7 +998,8 @@ class Builder(object):
                             "prefix": "ui-"
                         }
                     }
-                }
+                },
+                "autoLogin": compile_config['frontend'].AUTO_LOGIN
             }
 
         config['requirejs']['baseUrl'] = self.static_root_url
@@ -1163,6 +1193,7 @@ class FrontendBuilder(Builder):
         self.static_content_root_url = ''  # reverse('api:'+externalFrontendSettings.API_FRONTEND_PREFIX+self.name+':static-content-root')
         self.static_root_url = self.get_static_url(**config)
         self.static_img_root_url = self.static_root_url + 'img/'
+        self.static_css_root_url = self.static_root_url + 'css/'
         self.static_js_root_url = self.static_root_url + 'js/'
 
         self.clean(**config)
