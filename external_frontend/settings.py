@@ -63,12 +63,14 @@ config = {
             'STORAGE': None,
             'USED_STORAGE': [],
             'ADDITIONAL_BUILDER': [],
+            'PATCH_NAME_TO_PATH': None,
             'FRONTEND_URL': None,  # TODO: append to cors list if its served by this installation
         },
         'PLATFORM_COLLECTION': {},
         'STORAGE': {
             'NAME': None,
             'ROOT': None,
+            'STORAGE_CLASS': None,
             'FILTER': None,
             'CLEAN_BUILD': None,
             'REQUIRES_VERSIONED': None
@@ -102,6 +104,7 @@ config = {
         'STORAGE': {
             #'NAME': 'default',,
             'ROOT': django_settings.STATIC_ROOT,
+            'STORAGE_CLASS': 'django.core.files.storage.default_storage',
             'REQUIRES_VERSIONED': False
         },
         'STORAGE_COLLECTION': {
@@ -115,7 +118,7 @@ config = {
                 'CLASS': 'external_frontend.storage.StaticsStorage',
                 'CLEAN_BUILD': False,  # TODO: deleting files without build dirs
                 'REQUIRES_VERSIONED': True  # ionic view app needs versioning.
-            }
+            },
         },
         'BUILDER': {
             'SRC_NAME': '',
@@ -135,11 +138,8 @@ config = {
                 'TYPE': 'lib',
                 'PROTECTED': True,
                 'CONFIG': {
-                    'unversioned': [
-                        '^introspective_api/object.js',
-                        '^introspective_api/log.js',
-                        '^introspective_api/endpoint.js',
-                        '^introspective_api/client.js',
+                    'unversioned2': [
+                        '^introspective_api/',
                     ],
                 }
             },
@@ -171,7 +171,7 @@ config = {
             },
             'fancy-frontend': {
                 'NAME': 'fancy-frontend',
-                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@8424c9f08277f73b86bfa6c15996d6d6aa3816d8',
+                'SRC': 'https://github.com/ludwigkraatz/fancy-frontend.git@0ec93dffc88ff8cbcf7d58a476f2f0308fc845f2',
                 #'FILTER': '^fancy-frontend/',
                 'DEPENDS_ON': ['normalize', 'SVGInjector', 'introspective_api'],
                 #'TYPE': 'app',
@@ -181,7 +181,7 @@ config = {
                 'NAME': 'fancy-angular',
                 #'FILTER': '^fancy-angular/',
                 #'SRC_NAME': 'fancy_angular',
-                'SRC': 'https://github.com/suncircle/fancy-angular.git@54f3966f1a511822d58f883c890fcd9ffb353e79',
+                'SRC': 'https://github.com/suncircle/fancy-angular.git@e7d52a28eb121d965d3846e6d324a6766e3155ec',
                 'DEPENDS_ON': ['fancy-frontend'],
                 'PROTECTED': True
             },
@@ -204,7 +204,8 @@ config = {
             'STORAGE': 'default',
             'CLASS': 'external_frontend.platform.Platform',
             'ADDITIONAL_BUILDER': [],
-            'FRONTEND_HOST': '',
+            'FRONTEND_URL': '',
+            'PATCH_NAME_TO_PATH': True
         },
         'PLATFORM_COLLECTION': {
             'web': {
@@ -238,6 +239,7 @@ config = {
         'FRONTEND.ENDPOINT',
         #'FRONTEND.STORAGE_METHOD',
         'STORAGE.CLASS',
+        'STORAGE.STORAGE_CLASS',
         'BUILDER.CLASS',
         'PLATFORM.CLASS',
     ),

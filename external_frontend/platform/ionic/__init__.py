@@ -71,12 +71,6 @@ class Web(Platform):
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, width=device-width">
     """
 
-    def patch_path(self, path, *args, **config):
-        build_path = path
-        if build_path and not self.is_root_source(path):
-            build_path = os.path.join('www', build_path)
-        return build_path
-
     def get_template_context(self, builder, **config):
         context = {}
         context['CORDOVA_PATH'] = 'cordova.js'
@@ -98,14 +92,25 @@ class Web(Platform):
             compile_config['new_path'] = 'config.xml'
             builder.copy_src(**compile_config)
 
+
+class IOS(Web):
     def get_static_url(self, **config):
         return '/'
 
-
-class IOS(Web):
-    pass
+    def patch_path(self, path, *args, **config):
+        build_path = path
+        if build_path and not self.is_root_source(path):
+            build_path = os.path.join('www', build_path)
+        return build_path
 
 
 class Android(Web):
-    pass
+    def get_static_url(self, **config):
+        return '/'
+
+    def patch_path(self, path, *args, **config):
+        build_path = path
+        if build_path and not self.is_root_source(path):
+            build_path = os.path.join('www', build_path)
+        return build_path
 

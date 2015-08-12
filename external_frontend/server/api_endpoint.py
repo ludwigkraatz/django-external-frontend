@@ -56,7 +56,8 @@ class StaticsServer(RetrieveAPIView):
                         requested_file,
                         requirejsFallback=requirejsFallback,
                         frontend=self.frontend,
-                        platform=self.platform
+                        platform=self.platform,
+                        http=True
                     )
                 ).finalize_for(request)
             except storage.PathNotFound, e:

@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import shutil
 import json
 import logging
@@ -13,6 +14,7 @@ from django.utils.datastructures import SortedDict
 from django.core.urlresolvers import reverse
 from django.conf import settings
 from introspective_api.reverse import reverse_nested
+from introspective_api import get_consumer_model
 
 from ..utils.source import WrappedSource, wrappedGitMethodMap
 
@@ -562,7 +564,10 @@ class Builder(object):
         if compile_as is not None:
             return self.compile_src(compile_as=compile_as, **config)
         else:
-            return self.copy_src(**config)
+            ret = self.copy_src(**config)
+            if not config.get('build', False) and not config.get('compiling', False):
+                config.get('main_builder').compile(compile_only=['config', 'platform'], **config)
+            return ret
 
     def add_css_folder(self, path):
         self.css_sources[path] = None
@@ -764,6 +769,7 @@ class Builder(object):
         config.pop('path', None)
         config.pop('rel_path', None)
         config.pop('new_path', None)
+        config['compiling'] = True
 
         for compile_as, queue in self.compiler_queues.items():
             if compile_only:
@@ -926,7 +932,7 @@ class Builder(object):
     def build_frontend_config(self, content=None, **compile_config):
         config = {}
         for key in ['start', 'frontends', 'requirejs']:
-            config[key] = self.get_config(key) or {}
+            config[key] = copy.copy(self.get_config(key)) or {}
         for key in ['debug_level']:
             config[key] = self.get_config(key)
 
@@ -951,13 +957,18 @@ class Builder(object):
             host = app_config.get('base_url', self.host_root_url)  # TODO: get hostname & protocol from settings?
             if app == self.name:
                 config['start']['frontends'].append(app)
+
+            frontend_url = compile_config.get('platform').FRONTEND_URL
+            host_name = 'backend'
+            consumer_identifier = host + '|' + host_name
             config['frontends'][app] = {
                 'init': {
                     'default_host': 'backend',
                     'hosts': {
-                        'backend': {
+                        host_name: {
                             'host': host,
-                            'crossDomain': False
+                            'crossDomain': frontend_url and host.split('://')[-1] not in frontend_url,
+                            'consumerToken': get_consumer_model().objects.get_or_create(identifier=consumer_identifier)[0].asToken(host=host, frontend_url=frontend_url)
                         },
                         #'dynamic': {
                         #    'host': host,
@@ -966,6 +977,9 @@ class Builder(object):
                         #},
                         'static': {
                             'host': self.static_content_root_url
+                        },
+                        'media': {
+                            'host': self.static_content_root_url + 'media/'
                         },
                     }
                 },

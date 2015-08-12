@@ -38,6 +38,7 @@ class Platform(object):
 
     def __init__(self, **kwargs):
         self.name = kwargs['settings'].NAME
+        self._patch_platform_to_path = kwargs['settings'].PATCH_NAME_TO_PATH
 
     def generate_build_path(self, path, build_path):
         if build_path is not None and self.is_root_source(path):
@@ -45,7 +46,7 @@ class Platform(object):
         return build_path
 
     def patch_path(self, path, **config):
-        if path:  # TODO: and externalFrontendSettings.PATCH_PATH:
+        if path and self._patch_platform_to_path:
             path = os.path.join(self.name, path)
         return path
 
